@@ -1,7 +1,14 @@
 import React, { useState } from "react";
 import type { ProjectCommand, PublicArtifactDTO } from "@learning/contracts";
 import { Dialog } from "../../components/Dialog";
-export type SubmissionKind = "draft" | "final" | "note" | "learning" | "review";
+export type SubmissionKind =
+  | "draft"
+  | "final"
+  | "note"
+  | "learning"
+  | "review"
+  | "requirements"
+  | "policy";
 export function SubmissionCard({
   kind,
   busy,
@@ -9,6 +16,7 @@ export function SubmissionCard({
   onClose,
   note,
   reviewId,
+  policy,
 }: {
   kind: SubmissionKind;
   busy: boolean;
@@ -16,6 +24,7 @@ export function SubmissionCard({
   onClose: () => void;
   note?: PublicArtifactDTO;
   reviewId?: string;
+  policy?: { id: string; version: number };
 }) {
   const [text, setText] = useState(
       kind === "note" && !note?.tombstone ? (note?.content ?? "") : "",
@@ -28,6 +37,8 @@ export function SubmissionCard({
       note: "保存笔记",
       learning: "记录学习卡",
       review: "完成一次复习",
+      requirements: "补充要求",
+      policy: "修改检验政策",
     }[kind];
   return (
     <Dialog title={title} onClose={onClose}>
@@ -36,7 +47,16 @@ export function SubmissionCard({
           e.preventDefault();
           setError("");
           let command: ProjectCommand;
-          if (kind === "learning") {
+          if (kind === "requirements")
+            command = { type: "supplement_requirements", text };
+          else if (kind === "policy")
+            command = {
+              type: "revise_assessment_policy",
+              policy_id: policy!.id,
+              policy_version: policy!.version,
+              text,
+            };
+          else if (kind === "learning") {
             command = {
               type: "record_learning",
               text: `资料要解决的问题：${fields[0]}\n读懂1：${fields[1]}\n读懂2：${fields[2]}\n读懂3：${fields[3]}\n最有帮助的例子：${fields[4]}\n仍说不清的地方：${fields[5]}`,
@@ -89,11 +109,15 @@ export function SubmissionCard({
           ))
         ) : (
           <label>
-            {kind === "note"
-              ? "笔记正文"
-              : kind === "review"
-                ? "你的复习表达"
-                : "你的原稿"}
+            {kind === "requirements"
+              ? "补充要求正文"
+              : kind === "policy"
+                ? "政策修改要求"
+                : kind === "note"
+                  ? "笔记正文"
+                  : kind === "review"
+                    ? "你的复习表达"
+                    : "你的原稿"}
             <textarea
               autoFocus
               required
@@ -121,7 +145,11 @@ export function SubmissionCard({
                 ? "保存这个新版本"
                 : kind === "review"
                   ? "保存复习表达"
-                  : "整理这张学习卡"}
+                  : kind === "requirements"
+                    ? "原样保存并重新协调"
+                    : kind === "policy"
+                      ? "提出新政策草案"
+                      : "整理这张学习卡"}
         </button>
       </form>
     </Dialog>

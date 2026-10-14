@@ -13,3 +13,6 @@ test-results/
 playwright-report/
 coverage/
 .worktrees/
+!.dev.vars.example
+tests/evals/results*.jsonl
+tests/evals/results/

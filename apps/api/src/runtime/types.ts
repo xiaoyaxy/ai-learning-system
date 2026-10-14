@@ -15,6 +15,9 @@ export const RoleResultSchema = z
       .strict()
       .nullable(),
     request_id: z.string().optional(),
+    provider: z.string().optional(),
+    model: z.string().optional(),
+    generated_at: z.string().optional(),
   })
   .strict();
 export type RoleResult = z.infer<typeof RoleResultSchema>;

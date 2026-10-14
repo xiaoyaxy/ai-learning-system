@@ -359,3 +359,30 @@ test("归档与成果：学习卡引用、两次复习和笔记删除标记", as
     page.getByRole("dialog", { name: "学习笔记 · v1" }),
   ).toContainText("这是我的原笔记");
 });
+
+test("项目群聊：修改政策草案与补充要求重新协调", async ({ page }) => {
+  await page.goto("/");
+  await create(page, `Policy ${Date.now()}`);
+  await prepare(page);
+  await page.getByRole("button", { name: "补充要求", exact: true }).click();
+  await page
+    .getByLabel("补充要求正文")
+    .fill("保留目标与原期限，只重排材料顺序");
+  await page.getByRole("button", { name: "原样保存并重新协调" }).click();
+  await expect(page.getByLabel("学习群消息")).toContainText(
+    "补充要求已原样保存",
+  );
+  await expect(
+    page.getByRole("button", { name: "完成检验", exact: true }),
+  ).toBeEnabled({ timeout: 30000 });
+  await page.getByRole("button", { name: "完成检验", exact: true }).click();
+  await page.getByRole("button", { name: "修改这份检验政策" }).click();
+  await page.getByLabel("政策修改要求").fill("改为六题，仍然按第一答计算");
+  await page.getByRole("button", { name: "提出新政策草案" }).click();
+  await expect(page.locator(".policy")).toContainText("v2", { timeout: 30000 });
+  await expect(page.locator(".policy")).toContainText("6 题 / 轮");
+  await page.getByRole("button", { name: "确认这份检验政策" }).click();
+  await expect(
+    page.getByRole("button", { name: "确认这份检验政策" }),
+  ).toHaveCount(0);
+});

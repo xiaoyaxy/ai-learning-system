@@ -111,6 +111,16 @@ export async function runLearningCommand(
     await archive.answerWeekly(curatorCtx, command.text);
     return true;
   }
+  const originalCommand = w.runs.find((r) => r.id === run.id)?.command_json;
+  if (
+    originalCommand &&
+    JSON.parse(originalCommand).type === "supplement_requirements" &&
+    w.project.active_plan_id
+  ) {
+    if (!message) throw new ApiError("INVALID_STAGE", 409);
+    await planner.proposeRequirements(toolCtx, message.id);
+    return true;
+  }
   if (command.type === "decide_proposal") {
     await planner.recordDecision(toolCtx, command);
     return true;
@@ -127,6 +137,10 @@ export async function runLearningCommand(
   }
   if (command.type === "confirm_assessment_policy") {
     await assessment.confirmPolicy(coachCtx, command);
+    return true;
+  }
+  if (command.type === "revise_assessment_policy") {
+    await assessment.proposePolicy(coachCtx, command);
     return true;
   }
   if (

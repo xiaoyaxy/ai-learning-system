@@ -75,6 +75,12 @@ export function computeCompletion(
         attempt_id: selected.id,
         verdict: selected.verdict,
       });
+      if (
+        policy.attempt_basis === "after_correction" &&
+        selected.index === 1 &&
+        ["incorrect", "partial"].includes(selected.verdict ?? "")
+      )
+        missing = true;
       if (!selected.verdict || selected.verdict === "needs_review")
         uncertain = true;
       else if (

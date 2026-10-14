@@ -56,19 +56,76 @@ export class AdjustmentService {
     private repo: ProjectRepository,
     private execute: RoleExecutor,
   ) {}
-  async proposeAdjustment(ctx: ToolContext, feedbackId: string) {
+  async proposeRequirements(ctx: ToolContext, messageId: string) {
+    return this.proposeAdjustment(ctx, "user:" + messageId, messageId);
+  }
+  async proposeAdjustment(
+    ctx: ToolContext,
+    feedbackId: string,
+    sourceMessageId?: string,
+  ) {
     authorizeTool(ctx, { type: "propose_plan" });
+    await this.repo.getProject(ctx.owner_id, ctx.project_id);
     const w = await this.repo.readWorkspace(ctx.project_id),
       active = w.artifacts.find((a) => a.id === w.project.active_plan_id),
-      feedback = w.evaluations.find((e) => e.id === feedbackId);
+      message = sourceMessageId
+        ? w.messages.find(
+            (m) =>
+              m.id === sourceMessageId &&
+              m.sender_role === "user" &&
+              m.run_id === ctx.run_id,
+          )
+        : null,
+      feedback = sourceMessageId
+        ? message
+          ? {
+              id: message.id,
+              verdict: "user_requirements",
+              gap: message.body,
+              reveal_allowed: 1,
+            }
+          : null
+        : w.evaluations.find((e) => e.id === feedbackId);
     if (!active || !feedback || !feedback.reveal_allowed)
       throw new ApiError("INVALID_STAGE", 409);
-    const handoff = await this.repo.db
-      .prepare(
-        "SELECT seq FROM domain_events WHERE project_id=? AND type='handoff_committed' AND json_extract(payload_json,'$.entity_id')=? AND json_extract(payload_json,'$.to')='supervisor' LIMIT 1",
-      )
-      .bind(ctx.project_id, feedbackId)
-      .first();
+    let handoff: { seq: unknown } | null;
+    if (message) {
+      const current = await this.repo.getProject(ctx.owner_id, ctx.project_id);
+      const receipt = await this.repo.commitStep(
+        {
+          ...ctx,
+          actor: "supervisor",
+          step_key: "requirements_handoff",
+          base_revision: current.revision,
+        },
+        {
+          events: [
+            {
+              type: "handoff_committed",
+              role: "supervisor",
+              payload: {
+                from: "supervisor",
+                to: "planner",
+                entity_id: message.id,
+                text: "补充要求已原样保存，请按已提交的计划重评后续安排",
+              },
+            },
+          ],
+        },
+      );
+      handoff = await this.repo.db
+        .prepare(
+          "SELECT seq FROM domain_events WHERE project_id=? AND type='handoff_committed' AND json_extract(payload_json,'$.entity_id')=? ORDER BY seq DESC LIMIT 1",
+        )
+        .bind(ctx.project_id, message.id)
+        .first();
+    } else
+      handoff = await this.repo.db
+        .prepare(
+          "SELECT seq FROM domain_events WHERE project_id=? AND type='handoff_committed' AND json_extract(payload_json,'$.entity_id')=? AND json_extract(payload_json,'$.to')='supervisor' LIMIT 1",
+        )
+        .bind(ctx.project_id, feedbackId)
+        .first();
     if (!handoff) throw new ApiError("FORBIDDEN", 403);
     const old = JSON.parse(active.content),
       constraints: ExplicitConstraint[] = [
@@ -92,6 +149,7 @@ export class AdjustmentService {
         input: {
           active_plan: old,
           constraints,
+          requested_changes: message?.body ?? null,
           feedback: {
             id: feedbackId,
             verdict: feedback.verdict,
@@ -338,6 +396,9 @@ export class AdjustmentService {
             goal_version: w.project.goal_version + 1,
             items: [],
           }),
+          scope_questions: d.changed_constraints.some((c) => c.kind === "goal")
+            ? 0
+            : w.project.scope_questions,
           phase: d.changed_constraints.some((c) => c.kind === "goal")
             ? "scoping"
             : "learning",

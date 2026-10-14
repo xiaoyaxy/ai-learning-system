@@ -85,6 +85,12 @@ export class PlanningService {
     private repo: ProjectRepository,
     private execute: RoleExecutor,
   ) {}
+  async proposeRequirements(ctx: ToolContext, id: string) {
+    return new AdjustmentService(this.repo, this.execute).proposeRequirements(
+      ctx,
+      id,
+    );
+  }
   async proposeAdjustment(ctx: ToolContext, id: string) {
     return new AdjustmentService(this.repo, this.execute).proposeAdjustment(
       ctx,
@@ -333,6 +339,8 @@ export class PlanningService {
         action: { type: "write_artifact", kind: "plan" },
         input: {
           definition: JSON.parse(definition.content),
+          original_diagnosis:
+            w.artifacts.find((a) => a.kind === "diagnosis")?.content ?? null,
           materials: w.sources
             .filter((s) => input.source_ids.includes(String(s.id)))
             .map((s) => ({

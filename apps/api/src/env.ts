@@ -1,7 +1,7 @@
 export interface Env {
   DB: D1Database;
   PROJECT_SUPERVISOR: DurableObjectNamespace;
-  DEPLOYMENT_ENV: "local" | "staging" | "production";
+  DEPLOYMENT_ENV: "local" | "cloud";
   DEV_OWNER_ID?: string;
   PUBLIC_ORIGIN?: string;
   ACCESS_ISSUER?: string;
@@ -12,6 +12,7 @@ export interface Env {
   MODEL_NAME?: string;
   MODEL_API_KEY?: string;
   MODEL_API_URL?: string;
+  MODEL_TOKEN_PARAMETER?: "max_tokens" | "max_completion_tokens";
   AI?: Ai;
   SEARCH_PROVIDER?: string;
   SEARCH_API_KEY?: string;

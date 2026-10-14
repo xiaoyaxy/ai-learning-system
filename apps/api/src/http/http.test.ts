@@ -70,7 +70,7 @@ describe("protected public API", () => {
             "Cf-Access-Authenticated-User-Email": "owner@example.com",
           },
         }),
-        { ...testEnv, DEPLOYMENT_ENV: "production" },
+        { ...testEnv, DEPLOYMENT_ENV: "cloud" },
       ),
     ).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
   });
@@ -80,7 +80,7 @@ describe("protected public API", () => {
       publicKey = { ...(await exportJWK(keys.publicKey)), kid: "k" };
     const production = {
       ...testEnv,
-      DEPLOYMENT_ENV: "production",
+      DEPLOYMENT_ENV: "cloud",
       ACCESS_ISSUER: "https://access.test",
       ACCESS_AUDIENCE: "learning-aud",
       ALLOWED_EMAIL: "owner@example.com",

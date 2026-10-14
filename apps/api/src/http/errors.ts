@@ -44,6 +44,10 @@ export function publicError(error: unknown): {
     CONFIGURATION_REQUIRED: "需要配置模型、搜索或登录服务",
     POLICY_REQUIRED: "请先确认完成检验评分政策",
     STORAGE_UNAVAILABLE: "存储暂不可用，已有进度保留",
+    PROVIDER_AUTH_FAILED: "供应商认证失败，请检查服务器上的密钥配置",
+    PROVIDER_UNAVAILABLE: "供应商暂不可用，已有记录保留",
+    MODEL_INVALID_RESULT: "模型返回的内容不符合本步骤格式，已有记录保留",
+    INPUT_TOO_LARGE: "这一步上下文过长，请分段提供或缩短补充表达",
   };
   return {
     status,

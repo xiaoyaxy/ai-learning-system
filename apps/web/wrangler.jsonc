@@ -14,4 +14,5 @@
       "service": "ai-learning-api",
     },
   ],
+  "workers_dev": true,
 }

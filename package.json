@@ -8,15 +8,19 @@
     "packages/*"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12.0"
   },
   "scripts": {
-    "dev": "wrangler dev -c apps/api/wrangler.jsonc -c apps/web/wrangler.jsonc",
+    "dev": "npm exec --workspace apps/web -- vite build && wrangler dev -c apps/web/wrangler.jsonc -c apps/api/wrangler.jsonc --port 8787 --ip 127.0.0.1",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "tsc --noEmit",
     "test": "npm run test --workspaces --if-present",
     "test:e2e": "playwright test -c tests/e2e/playwright.config.ts",
-    "dev:e2e": "npm exec --workspace apps/web -- vite build && wrangler d1 migrations apply ai-learning-e2e --local -c apps/api/wrangler.e2e.jsonc --persist-to .wrangler/e2e && wrangler dev -c apps/web/wrangler.e2e.jsonc -c apps/api/wrangler.e2e.jsonc --port 8787 --persist-to .wrangler/e2e"
+    "dev:e2e": "npm exec --workspace apps/web -- vite build && wrangler d1 migrations apply ai-learning-e2e --local -c apps/api/wrangler.e2e.jsonc --persist-to .wrangler/e2e && wrangler dev -c apps/web/wrangler.e2e.jsonc -c apps/api/wrangler.e2e.jsonc --port 8787 --persist-to .wrangler/e2e",
+    "demo": "npm exec --workspace apps/web -- vite build && wrangler d1 migrations apply ai-learning-e2e --local -c apps/api/wrangler.e2e.jsonc --persist-to .wrangler/demo && wrangler dev -c apps/web/wrangler.e2e.jsonc -c apps/api/wrangler.e2e.jsonc --port 8787 --persist-to .wrangler/demo",
+    "migrate:local": "wrangler d1 migrations apply ai-learning --local -c apps/api/wrangler.jsonc",
+    "migrate:remote": "wrangler d1 migrations apply ai-learning --remote -c apps/api/wrangler.jsonc",
+    "deploy": "npm exec --workspace apps/web -- vite build && wrangler deploy -c apps/api/wrangler.jsonc && wrangler deploy -c apps/web/wrangler.jsonc"
   },
   "dependencies": {
     "@tanstack/react-query": "5.104.2",

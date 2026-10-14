@@ -394,7 +394,7 @@ expect(runAfterFailure.committed_artifacts).toEqual(runBeforeFailure.committed_a
 - [ ] **Step 3：运行红灯并实现真实适配。** `npm test --workspace apps/api -- live-adapters.test.ts`；再实现选定服务、secrets、错误映射、预算与已知用量。真实 URL 提取证明公网／重定向限制；缺失能力时使用可验证的受控提取服务，不直接放开任意 fetch。
 - [ ] **Step 4：运行整体自动验证。** `npm run typecheck`、`npm test`、`npm run build`、`npm run test:e2e`，全部成功；核对 A01–A16。mock 测试结果与真实模型质量分栏记录，不写未运行的 PASS。
 - [ ] **Step 5：验证真实模型与免费可行性。** 用不少于 12 个精心设计的固定样例覆盖角色权限、先答后评、一次追问、来源支持、开放题不确定、错误概念、目标影响、用户理解缺项、不代写与医法金边界；人工核对输出与引用。重复出现泄题／越权／代写的模型不得上线该功能。测一次建项目全链、一次测验纠错、一次请示，记录 Worker CPU、D1 rows_read／rows_written、DO 和模型／搜索已知用量；免费限额不满足则先提出可验证调整，不自行升级付费。
-- [ ] **Step 6：按发布手册部署授权环境。** local→staging→production 分库／命名空间；迁移→API→Web。API 禁公共入口，配置 Access 或已选鉴权，Web 同源转发。Secrets 用 Wrangler secret 配置，不进入代码或输出。保留迁移与应用回滚步骤；回滚不能删除诊断／答题历史。
+- [ ] **Step 6：按发布手册部署授权环境。** 按用户 2026-10-14 指示，仅一个 demo 云环境，本地一条命令启动；迁移→API→Web。API 禁公共入口，配置 Access 或已选鉴权，Web 同源转发。Secrets 用 Wrangler secret 配置，不进入代码或输出。保留迁移与应用回滚步骤；回滚不能删除诊断／答题历史。
 - [ ] **Step 7：重开线上页面验收并提交。** 登录本人身份，运行两个项目隔离、来源读取、等待作答、80% 证据（已确认政策）、目标请示、暂停重开及搜索失败场景；核对控制台与真实保存记录。docs/acceptance.md 填实际日期、模型／版本、A01–A16 证据、未过项和限制。`git add apps/api/src/providers apps/api/src/env.ts apps/api/wrangler.jsonc apps/web/wrangler.jsonc tests/evals docs/deployment.md docs/acceptance.md`；`git commit -m "feat: validate live providers and Cloudflare deployment"`。配置或验收未完成时记录未完成，不写成已上线。
 
 ## 4. 自查与交付标准

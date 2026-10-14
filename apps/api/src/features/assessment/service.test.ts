@@ -334,6 +334,11 @@ describe("confirmed assessment policy and fixed sessions", () => {
       phase: "completed",
       completion: { status: "met", correct_count: 5, total_count: 5 },
     });
+    await command({ type: "start_completion_check" });
+    await service.start(context, "completion");
+    expect(
+      toWorkspaceDTO(await repo.readWorkspace(p.id)).completion.status,
+    ).toBe("in_progress");
   });
 });
 
@@ -384,4 +389,74 @@ it("rechecks an uncertain grade by appending an evaluation without another answe
     verdict: "correct",
     supersedes_id: after.evaluations[0].id,
   });
+});
+
+it("versions a requested policy revision without overwriting the previous draft", async () => {
+  const { repo, p, ctx } = await fixture(),
+    w = await repo.readWorkspace(p.id);
+  await repo.commitStep(
+    {
+      ...ctx,
+      actor: "planner",
+      step_key: "definition-revise",
+      base_revision: w.project.revision,
+    },
+    {
+      entities: [
+        {
+          table: "artifacts",
+          row: {
+            id: "def",
+            kind: "definition",
+            version: 1,
+            content: JSON.stringify({ skills: ["concept"] }),
+            evidence_message_ids: "[]",
+          },
+        },
+      ],
+      project_changes: { pending_input_json: null },
+      run_changes: { run_id: ctx.run_id, status: "waiting_user" },
+    },
+  );
+  let count = 5;
+  const service = new AssessmentService(repo, async () => ({
+    kind: "assessment_policy",
+    content: {
+      question_count: count,
+      required_skill_ids: ["concept"],
+      rubric: {
+        correct_criteria: ["区分概念"],
+        uncertain_rule: "needs_review",
+      },
+      partial_rule: "count_incorrect",
+      attempt_basis: "first",
+      aggregation: "single_session",
+      session_count: 1,
+    },
+    evidence_ids: [],
+    usage: null,
+  }));
+  const first = await service.proposePolicy(ctx);
+  count = 6;
+  const current = await repo.getProject(ctx.owner_id, p.id),
+    op = crypto.randomUUID(),
+    accepted = await repo.acceptCommand(
+      { owner_id: ctx.owner_id, project_id: p.id },
+      {
+        client_operation_id: op,
+        expected_revision: current.revision,
+        command: {
+          type: "revise_assessment_policy",
+          policy_id: first.id,
+          policy_version: 1,
+          text: "改为六题",
+        },
+      },
+    );
+  const next = await service.proposePolicy(
+    { ...ctx, operation_id: op, run_id: accepted.run_id },
+    { policy_id: first.id, policy_version: 1, text: "改为六题" },
+  );
+  expect(next.version).toBe(2);
+  expect((await repo.readWorkspace(p.id)).policies).toHaveLength(2);
 });

@@ -69,7 +69,11 @@ export function demoResult(task: RoleTask): RoleResult {
     }
     case "assessment_policy":
       content = {
-        question_count: 5,
+        question_count:
+          String(x.requested_changes ?? "").includes("六") ||
+          String(x.requested_changes ?? "").includes("6")
+            ? 6
+            : 5,
         required_skill_ids: ["concept"],
         rubric: {
           correct_criteria: ["能独立区分 Agent 的决策职责与工具的执行职责"],

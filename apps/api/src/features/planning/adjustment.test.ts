@@ -260,3 +260,29 @@ for (const decision of ["retain", "pause"] as const)
       decision === "pause" ? "paused" : "retained",
     );
   });
+
+it("re-evaluates saved user requirements through the supervisor without inventing a coach grade", async () => {
+  const { repo, p, ctx } = await setup(),
+    w = await repo.readWorkspace(p.id),
+    message = w.messages[0];
+  let input: any;
+  const service = new PlanningService(repo, async (task) => {
+    input = task.public_context;
+    return {
+      kind: "adjustment",
+      content: {
+        plan: JSON.parse(w.artifacts.find((a) => a.id === "plan")!.content),
+        changed_constraints: [],
+        estimated_finish: null,
+        estimate_basis: "只调整已有任务顺序",
+        potentially_delays: false,
+        summary: "按用户补充要求重排",
+      },
+      evidence_ids: [message.id],
+      usage: null,
+    };
+  });
+  await service.proposeRequirements(ctx, message.id);
+  expect(input.requested_changes).toBe(message.body);
+  expect((await repo.readWorkspace(p.id)).proposals).toHaveLength(1);
+});

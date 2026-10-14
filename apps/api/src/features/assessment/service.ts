@@ -443,7 +443,11 @@ export class AssessmentService {
       verdict: String(result.result.verdict),
     };
   }
-  async proposePolicy(ctx: ToolContext) {
+  async proposePolicy(
+    ctx: ToolContext,
+    revision?: { policy_id: string; policy_version: number; text: string },
+  ) {
+    await this.repo.getProject(ctx.owner_id, ctx.project_id);
     const w = await this.repo.readWorkspace(ctx.project_id),
       definition = w.artifacts.filter((a) => a.kind === "definition").at(-1);
     if (
@@ -453,7 +457,24 @@ export class AssessmentService {
     )
       throw new ApiError("INVALID_STAGE", 409);
     const existing = w.policies.at(-1);
+    const requestMessage = revision
+      ? w.messages.find(
+          (m) =>
+            m.run_id === ctx.run_id &&
+            m.sender_role === "user" &&
+            m.body === revision.text,
+        )
+      : null;
     if (
+      revision &&
+      (!existing ||
+        existing.id !== revision.policy_id ||
+        Number(existing.version) !== revision.policy_version ||
+        !requestMessage)
+    )
+      throw new ApiError("REVISION_CONFLICT", 409);
+    if (
+      !revision &&
       existing &&
       JSON.parse(String(existing.policy_json)).goal_version ===
         w.project.goal_version
@@ -470,6 +491,10 @@ export class AssessmentService {
         action: { type: "present_question" },
         input: {
           skills,
+          prior_policy: existing
+            ? JSON.parse(String(existing.policy_json))
+            : null,
+          requested_changes: revision?.text ?? null,
           output_contract: {
             question_count: "integer 1-50 and at least number of skills",
             required_skill_ids: skills,
@@ -559,6 +584,7 @@ export class AssessmentService {
     ctx: ToolContext,
     input: { policy_id: string; policy_version: number },
   ) {
+    await this.repo.getProject(ctx.owner_id, ctx.project_id);
     const w = await this.repo.readWorkspace(ctx.project_id),
       p = w.policies.find((p) => p.id === input.policy_id),
       message = w.messages.find(
@@ -571,10 +597,19 @@ export class AssessmentService {
       p.id !== w.policies.at(-1)?.id
     )
       throw new ApiError("REVISION_CONFLICT", 409);
-    if (p.status === "confirmed") return;
     const policy = JSON.parse(String(p.policy_json)) as AssessmentPolicy;
     if (policy.goal_version !== w.project.goal_version)
       throw new ApiError("REVISION_CONFLICT", 409);
+    const command = JSON.parse(
+      w.runs.find((r) => r.id === ctx.run_id)?.command_json ?? "null",
+    );
+    if (
+      command?.type !== "confirm_assessment_policy" ||
+      command.policy_id !== input.policy_id ||
+      command.policy_version !== input.policy_version
+    )
+      throw new ApiError("FORBIDDEN", 403);
+    if (p.status === "confirmed") return;
     policy.status = "confirmed";
     policy.confirmed_message_id = message.id;
     await this.commit({ ...ctx, actor: "trusted_ingress" }, "confirm_policy", {
@@ -583,6 +618,17 @@ export class AssessmentService {
         status: "confirmed",
         confirmed_message_id: message.id,
         policy_json: JSON.stringify(policy),
+      },
+      project_changes: {
+        completion_json: JSON.stringify({
+          status: "in_progress",
+          correct_count: null,
+          total_count: null,
+          policy_version: policy.version,
+          goal_version: w.project.goal_version,
+          items: [],
+        }),
+        phase: w.project.phase === "completed" ? "learning" : w.project.phase,
       },
       run_changes: { run_id: ctx.run_id, status: "waiting_user" },
       events: [
@@ -795,6 +841,16 @@ export class AssessmentService {
     )!;
     await this.commit(ctx, `present:${session.id}`, {
       project_changes: {
+        ...(purpose === "completion"
+          ? {
+              completion_json: JSON.stringify(
+                computeCompletion(
+                  policy,
+                  completionInput(w, String(session.id)),
+                ),
+              ),
+            }
+          : {}),
         phase: purpose === "completion" ? "completion_check" : "practicing",
         pending_input_json: JSON.stringify({
           kind: "answer",

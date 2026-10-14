@@ -21,6 +21,14 @@ export const ProjectCommandSchema = z.discriminatedUnion("type", [
   typed("start_learning"),
   typed("start_practice"),
   typed("start_completion_check"),
+  z
+    .object({
+      type: z.literal("revise_assessment_policy"),
+      policy_id: id,
+      policy_version: z.number().int().positive(),
+      text,
+    })
+    .strict(),
   typed("start_weekly_review"),
   z.object({ type: z.literal("record_learning"), text }).strict(),
   z

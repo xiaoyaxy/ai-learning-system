@@ -96,6 +96,11 @@ describe("completion evidence", () => {
       index: 2,
       verdict: "correct",
     });
+    corrected.questions[4].attempts.push({
+      id: "second-wrong",
+      index: 2,
+      verdict: "incorrect",
+    });
     expect(computeCompletion(policy, corrected).status).toBe("not_met");
     expect(
       computeCompletion(
@@ -140,4 +145,13 @@ describe("completion evidence", () => {
       ),
     ).toMatchObject({ status: "met", correct_count: 8, total_count: 10 });
   });
+});
+
+it("waits for the correction answer when the confirmed policy selects correction scoring", () => {
+  expect(
+    computeCompletion(
+      { ...policy, attempt_basis: "after_correction" },
+      evidence(4),
+    ).status,
+  ).toBe("in_progress");
 });

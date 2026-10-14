@@ -12,6 +12,7 @@ import { toWorkspaceDTO, toPublicEvent } from "./projector";
 import { ApiError, publicError } from "./errors";
 import type { Env } from "../env";
 import { exportProject } from "../features/archive/export";
+import {checkReadiness} from "../providers/readiness";
 export interface CommandDispatcher {
   accept(
     principal: Principal,
@@ -43,6 +44,7 @@ export function createApp(deps: {
     }
     await next();
   });
+  app.get("/api/v1/readiness",c=>c.json(checkReadiness(c.env)));
   app.get("/api/v1/projects", async (c) => {
     const rows = await deps.repo.listProjects(c.get("principal").owner_id);
     return c.json(

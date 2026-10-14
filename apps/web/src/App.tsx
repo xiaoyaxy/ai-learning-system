@@ -1,3 +1,4 @@
+import { SubmissionCard } from "./features/archive/SubmissionCard";
 import { artifactNames } from "./lib/labels";
 import { Dialog } from "./components/Dialog";
 import { ArtifactView } from "./features/archive/ArtifactView";
@@ -192,6 +193,8 @@ function Workspace({ projectId }: { projectId: string }) {
     [details, setDetails] = useState(false),
     [artifact, setArtifact] = useState<PublicArtifactDTO | null>(null),
     [archives, setArchives] = useState(false),
+    [requirements, setRequirements] = useState(false),
+    [editPolicy, setEditPolicy] = useState(false),
     lock = useRef(false),
     active = ["queued", "running"].includes(w?.active_run?.status ?? ""),
     { events, status } = useProjectEvents(
@@ -252,6 +255,7 @@ function Workspace({ projectId }: { projectId: string }) {
           <div className="header-actions">
             <button onClick={() => setDetails(true)}>群资料</button>
             <button onClick={() => setArchives(true)}>项目档案</button>
+            <button onClick={() => setRequirements(true)}>补充要求</button>
             {run && active && (
               <button
                 onClick={() =>
@@ -396,6 +400,12 @@ function Workspace({ projectId }: { projectId: string }) {
               </span>
               <h2>由你确认，才作为完成依据</h2>
               <PolicySummary json={w.policy.summary} />
+              <button
+                disabled={busy || active}
+                onClick={() => setEditPolicy(true)}
+              >
+                修改这份检验政策
+              </button>
               <button
                 className="primary"
                 disabled={busy || active}
@@ -574,6 +584,23 @@ function Workspace({ projectId }: { projectId: string }) {
         </footer>
       </main>
       <aside className="context-panel">{context}</aside>
+      {requirements && (
+        <SubmissionCard
+          kind="requirements"
+          busy={busy}
+          onSend={send}
+          onClose={() => setRequirements(false)}
+        />
+      )}
+      {editPolicy && w.policy && (
+        <SubmissionCard
+          kind="policy"
+          busy={busy || active}
+          policy={w.policy}
+          onSend={send}
+          onClose={() => setEditPolicy(false)}
+        />
+      )}
       {archives && (
         <Dialog title="项目档案" onClose={() => setArchives(false)}>
           <ArchivePanel
@@ -585,7 +612,8 @@ function Workspace({ projectId }: { projectId: string }) {
         </Dialog>
       )}
       {w.assessments
-        ?.flatMap((q) => q.attempts)
+        ?.filter((q) => q.goal_version === w.project.goal_version)
+        .flatMap((q) => q.attempts)
         .filter((a) => a.evaluations.at(-1)?.verdict === "needs_review")
         .map((a) => (
           <div className="review-notice" key={a.id}>
