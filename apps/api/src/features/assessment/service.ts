@@ -382,6 +382,7 @@ export class AssessmentService {
                     payload: {
                       from: "coach" as const,
                       to: "supervisor" as const,
+                      entity_id: id,
                       text: "答题反馈已交给总管，后续计划由规划师处理",
                     },
                   },
@@ -401,7 +402,12 @@ export class AssessmentService {
   async proposePolicy(ctx: ToolContext) {
     const w = await this.repo.readWorkspace(ctx.project_id),
       definition = w.artifacts.filter((a) => a.kind === "definition").at(-1);
-    if (!definition) throw new ApiError("INVALID_STAGE", 409);
+    if (
+      !definition ||
+      (JSON.parse(definition.content).goal_text &&
+        JSON.parse(definition.content).goal_text !== w.project.goal_text)
+    )
+      throw new ApiError("INVALID_STAGE", 409);
     const existing = w.policies.at(-1);
     if (
       existing &&
@@ -549,7 +555,12 @@ export class AssessmentService {
     const definition = w.artifacts
       .filter((a) => a.kind === "definition")
       .at(-1);
-    if (!definition) throw new ApiError("INVALID_STAGE", 409);
+    if (
+      !definition ||
+      (JSON.parse(definition.content).goal_text &&
+        JSON.parse(definition.content).goal_text !== w.project.goal_text)
+    )
+      throw new ApiError("INVALID_STAGE", 409);
     const skills = JSON.parse(definition.content).skills as string[],
       policy = confirmed(w);
     if (

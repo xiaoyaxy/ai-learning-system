@@ -25,7 +25,7 @@ export function toWorkspaceDTO(r: WorkspaceRecord): WorkspaceDTO {
   const run = r.runs.find((x) => x.id === p.active_run_id);
   const proposal = [...r.proposals]
     .reverse()
-    .find((x) => x.status === "pending");
+    .find((x) => ["pending", "paused"].includes(String(x.status)));
   const policy = r.policies.at(-1);
   const attempts = r.attempts.filter((a) => a.question_id === question?.id);
   const evaluation = r.evaluations

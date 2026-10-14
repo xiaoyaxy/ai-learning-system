@@ -510,6 +510,21 @@ export class ProjectRepository {
           ),
       );
     }
+    if (writes.proposal_changes) {
+      if (!["planner", "trusted_ingress"].includes(ctx.actor))
+        throw new RepositoryError("FORBIDDEN");
+      statements.push(
+        this.db
+          .prepare(
+            "UPDATE plan_proposals SET status=? WHERE project_id=? AND id=?",
+          )
+          .bind(
+            writes.proposal_changes.status,
+            ctx.project_id,
+            writes.proposal_changes.id,
+          ),
+      );
+    }
     if (writes.provider_changes) {
       const { id, ...v } = writes.provider_changes;
       const ks = Object.keys(v);

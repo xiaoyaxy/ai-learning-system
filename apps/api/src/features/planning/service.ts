@@ -1,3 +1,4 @@
+import { AdjustmentService, type DecideProposal } from "./adjustment";
 import { z } from "zod";
 import type { RoleTask, RoleResult } from "../../runtime/types";
 import type { ToolContext } from "../../runtime/tool-context";
@@ -84,6 +85,18 @@ export class PlanningService {
     private repo: ProjectRepository,
     private execute: RoleExecutor,
   ) {}
+  async proposeAdjustment(ctx: ToolContext, id: string) {
+    return new AdjustmentService(this.repo, this.execute).proposeAdjustment(
+      ctx,
+      id,
+    );
+  }
+  async recordDecision(ctx: ToolContext, input: DecideProposal) {
+    return new AdjustmentService(this.repo, this.execute).recordDecision(
+      ctx,
+      input,
+    );
+  }
   private task(
     ctx: ToolContext,
     key: string,
@@ -201,6 +214,8 @@ export class PlanningService {
         }
         const definition = {
             ...parsed.definition,
+            goal_version: current.project.goal_version,
+            goal_text: current.project.goal_text,
             time_constraint_text: current.project.time_constraint_text,
             time_setting: null,
           },

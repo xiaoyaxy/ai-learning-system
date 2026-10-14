@@ -34,6 +34,10 @@ export async function runLearningCommand(
     };
   const assessment = new AssessmentService(repo, execute),
     coachCtx = { ...toolCtx, actor: "coach" as const };
+  if (command.type === "decide_proposal") {
+    await planner.recordDecision(toolCtx, command);
+    return true;
+  }
   if (
     command.type === "start_practice" ||
     command.type === "start_completion_check"
@@ -86,7 +90,16 @@ export async function runLearningCommand(
             : null;
     if (!input) throw new ApiError("INVALID_STAGE", 409);
     const attempt = await assessment.submit(coachCtx, input);
-    await assessment.evaluate(coachCtx, attempt);
+    const evaluation = await assessment.evaluate(coachCtx, attempt);
+    const after = await repo.readWorkspace(ctx.project_id);
+    if (
+      evaluation.reveal_allowed &&
+      ["incorrect", "partial"].includes(evaluation.verdict) &&
+      !after.project.pending_input_json &&
+      after.project.active_plan_id
+    ) {
+      await planner.proposeAdjustment(toolCtx, evaluation.id);
+    }
     return true;
   }
   if (

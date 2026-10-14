@@ -113,6 +113,7 @@ export interface EntityWrite {
   row: Record<string, RowValue>;
 }
 export interface StepWriteSet {
+  proposal_changes?: { id: string; status: string };
   policy_changes?: {
     id: string;
     status: string;
