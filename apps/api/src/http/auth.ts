@@ -1,6 +1,7 @@
 import { createLocalJWKSet, createRemoteJWKSet, jwtVerify } from "jose";
 import type { Env } from "../env";
 import { ApiError } from "./errors";
+import { verifyDemoSession } from "./password";
 export interface Principal {
   owner_id: string;
 }
@@ -11,6 +12,7 @@ export async function authenticate(
 ): Promise<Principal> {
   if (env.DEPLOYMENT_ENV === "local" && env.DEV_OWNER_ID)
     return { owner_id: env.DEV_OWNER_ID };
+  if (env.AUTH_MODE === "demo-password") return verifyDemoSession(request, env);
   if (!env.ACCESS_ISSUER || !env.ACCESS_AUDIENCE || !env.ALLOWED_EMAIL)
     throw new ApiError("UNAUTHENTICATED", 401);
   const token =

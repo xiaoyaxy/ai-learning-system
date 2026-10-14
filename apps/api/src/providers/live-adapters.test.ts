@@ -384,3 +384,80 @@ it("gives the model a complete envelope schema with a fixed outer kind", async (
     '"required":["kind","content","evidence_ids"]',
   );
 });
+
+it("binds result kind to the requested action only after validating its concrete content schema", async () => {
+  const call = response(200, {
+    choices: [
+      {
+        message: {
+          content: JSON.stringify({ ...payload, kind: "definition" }),
+        },
+      },
+    ],
+  });
+  await expect(
+    new ConfiguredModelGateway(configured, { fetch: call }).generate(request),
+  ).resolves.toMatchObject({
+    kind: "message",
+    content: { text: "先明确目标" },
+  });
+  await expect(
+    new ConfiguredModelGateway(configured, {
+      fetch: response(200, {
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                kind: "definition",
+                content: { role: "planner" },
+                evidence_ids: [],
+              }),
+            },
+          },
+        ],
+      }),
+    }).generate(request),
+  ).rejects.toMatchObject({ code: "MODEL_INVALID_RESULT" });
+});
+
+it("handles a completed model response with one redundant closing brace without changing text", async () => {
+  const result = {
+    ...payload,
+    content: { text: "文本中有 } } 和 {，这些必须保留。" },
+  };
+  const malformed = JSON.stringify(result).replace(
+    '},"evidence_ids"',
+    '}},"evidence_ids"',
+  );
+  await expect(
+    new ConfiguredModelGateway(configured, {
+      fetch: response(200, {
+        choices: [{ finish_reason: "stop", message: { content: malformed } }],
+      }),
+    }).generate(request),
+  ).resolves.toMatchObject(result);
+});
+it("does not repair truncated outputs or accept invented usage fields after a syntax repair", async () => {
+  const malformed = JSON.stringify(payload).replace(
+    '},"evidence_ids"',
+    '}},"evidence_ids"',
+  );
+  await expect(
+    new ConfiguredModelGateway(configured, {
+      fetch: response(200, {
+        choices: [{ finish_reason: "length", message: { content: malformed } }],
+      }),
+    }).generate(request),
+  ).rejects.toMatchObject({ code: "MODEL_INVALID_RESULT" });
+  const fake = JSON.stringify({
+    ...payload,
+    usage: { input_tokens: 0 },
+  }).replace('},"evidence_ids"', '}},"evidence_ids"');
+  await expect(
+    new ConfiguredModelGateway(configured, {
+      fetch: response(200, {
+        choices: [{ finish_reason: "stop", message: { content: fake } }],
+      }),
+    }).generate(request),
+  ).rejects.toMatchObject({ code: "MODEL_INVALID_RESULT" });
+});

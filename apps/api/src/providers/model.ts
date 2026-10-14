@@ -27,6 +27,51 @@ const GeneratedSchema = z
     evidence_ids: z.array(z.string()),
   })
   .strict();
+function parseModelValue(value: unknown, finishReason: unknown): unknown {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    if (finishReason !== "stop") throw error;
+    let quoted = false,
+      escaped = false,
+      balance = 0,
+      previous = "";
+    const positions: number[] = [];
+    for (let i = 0; i < value.length; i++) {
+      const c = value[i];
+      if (quoted) {
+        if (escaped) escaped = false;
+        else if (c === "\\") escaped = true;
+        else if (c === '"') {
+          quoted = false;
+          previous = c;
+        }
+        continue;
+      }
+      if (c === '"') quoted = true;
+      if (c === "{") balance++;
+      if (c === "}") {
+        balance--;
+        if (previous === "}") positions.push(i);
+      }
+      if (!/\s/.test(c)) previous = c;
+    }
+    // Only one redundant structural brace, never text edits or truncated JSON.
+    if (quoted || balance !== -1 || positions.length > 32) throw error;
+    const candidates = new Map<string, unknown>();
+    for (const i of positions) {
+      try {
+        const parsed = JSON.parse(value.slice(0, i) + value.slice(i + 1));
+        candidates.set(JSON.stringify(parsed), parsed);
+      } catch {
+        /* Candidate remains invalid. */
+      }
+    }
+    if (candidates.size !== 1) throw error;
+    return candidates.values().next().value;
+  }
+}
 function reportedUsage(raw: unknown): RoleResult["usage"] {
   if (!raw || typeof raw !== "object") return null;
   const v = raw as Record<string, unknown>,
@@ -187,9 +232,15 @@ export class ConfiguredModelGateway implements ModelGateway {
         provider === "workers-ai"
           ? carrier?.response
           : carrier?.choices?.[0]?.message?.content;
-      generated = typeof value === "string" ? JSON.parse(value) : value;
+      generated = parseModelValue(value, carrier?.choices?.[0]?.finish_reason);
       const parsed = GeneratedSchema.parse(generated);
-      if (parsed.kind !== request.schema_name) throw new Error("wrong kind");
+      const schema =
+        contract && typeof contract === "object" && "$schema" in contract
+          ? z.fromJSONSchema(contract as Parameters<typeof z.fromJSONSchema>[0])
+          : null;
+      if (schema) schema.parse(parsed.content);
+      else if (parsed.kind !== request.schema_name)
+        throw new Error("wrong kind");
       if (request.task.action === "route")
         z.object({ role: z.enum(["planner", "curator", "coach"]) })
           .strict()
@@ -200,6 +251,7 @@ export class ConfiguredModelGateway implements ModelGateway {
           .parse(parsed.content);
       return RoleResultSchema.parse({
         ...parsed,
+        kind: request.schema_name,
         usage: reportedUsage(carrier?.usage),
         request_id: typeof carrier?.id === "string" ? carrier.id : requestId,
         provider,

@@ -1,3 +1,4 @@
+import { DemoLogin } from "./features/auth/DemoLogin";
 import { CurrentPlan } from "./features/planning/CurrentPlan";
 import { SubmissionCard } from "./features/archive/SubmissionCard";
 import { artifactNames } from "./lib/labels";
@@ -52,6 +53,7 @@ const completionNames: Record<string, string> = {
 };
 
 export function App() {
+  const queryClient = useQueryClient();
   const projects = useQuery({
       queryKey: ["projects"],
       queryFn: api.listProjects,
@@ -139,7 +141,14 @@ export function App() {
           </div>
         </div>
       </aside>
-      {projects.error && !projects.data ? (
+      {projects.error instanceof RequestError &&
+      projects.error.status === 401 ? (
+        <DemoLogin
+          onSuccess={() => {
+            void queryClient.invalidateQueries();
+          }}
+        />
+      ) : projects.error && !projects.data ? (
         <div className="empty">
           <h1>暂时无法打开学习空间</h1>
           <p role="alert">{projects.error.message}</p>

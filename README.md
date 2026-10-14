@@ -36,7 +36,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-仅一个 demo 云环境，不分 staging／production。配置 Cloudflare 数据库、访问身份和供应商后，执行 `npm run migrate:remote`、`npm run deploy`。目前没有云端部署；步骤见 [运行与部署](docs/deployment.md)。
+仅一个 demo 云环境，不分 staging／production。已部署：[打开学习群](https://ai-learning-web.syl-pi-agent.workers.dev)。输入单人 demo 访问密码即可使用；密钥和密码只保存在 Cloudflare Secrets。本机密码文件为被忽略的 `.env.demo-access`。重新部署执行 `npm run migrate:remote`、`npm run deploy`；步骤见 [运行与部署](docs/deployment.md)。
 
 ## 项目文件
 

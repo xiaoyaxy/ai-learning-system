@@ -25,35 +25,32 @@ npm run dev
 
 适配协议：[JSON mode](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=chat)、[Tavily search](https://docs.tavily.com/documentation/api-reference/endpoint/search)。输出还需要通过应用 schema 校验；用量仅采用供应商实际返回的数据，缺失显示未知。
 
-## 3. 一个 Cloudflare demo 环境
+## 3. Cloudflare demo
 
-按用户要求部署到单一 Cloudflare demo 环境。目前正在恢复账号授权；授权完成后创建 D1、应用迁移、配置 Secrets，并部署两个 Worker。
+当前已部署：[知行学习群](https://ai-learning-web.syl-pi-agent.workers.dev)。使用单人访问密码，不需要 Cloudflare Access 或绑定银行卡。首次输入密码后，安全 Cookie 保持登录12小时；过期时刷新页面重新登录。
+
+当前账号和 D1 ID 已写入 Wrangler 配置。复制到自己的账号时，需要改 `account_id`，创建自己的 D1 并替换 `database_id`。`PUBLIC_ORIGIN` 必须是网页实际 HTTPS origin。API 的 `workers_dev=false`，仅通过网页的 Service Binding 调用。
 
 ```sh
-npx wrangler login
+npx wrangler login --scopes account:read user:read workers:write workers_scripts:write d1:write
 npx wrangler d1 create ai-learning
-```
-
-把返回的 database_id 写到 `apps/api/wrangler.jsonc` 的 D1 binding，保留 `DEPLOYMENT_ENV=cloud`。API 的 `workers_dev=false`，不添加公共路由。
-
-在 API 配置的 vars 中填写模型／搜索类型、模型名、API URL（不含 Key）、`PUBLIC_ORIGIN`（网页实际 HTTPS origin），以及访问控制的 `ACCESS_ISSUER`、`ACCESS_AUDIENCE`、`ALLOWED_EMAIL`。密钥交互写入：
-
-```sh
 npx wrangler secret put MODEL_API_KEY -c apps/api/wrangler.jsonc
 npx wrangler secret put SEARCH_API_KEY -c apps/api/wrangler.jsonc
+npx wrangler secret put DEMO_ACCESS_PASSWORD -c apps/api/wrangler.jsonc
+npx wrangler secret put DEMO_SESSION_SECRET -c apps/api/wrangler.jsonc
 npm run migrate:remote
 npm run deploy
 ```
 
-先部署 API 再部署 Web。Web 默认可以使用 workers.dev 地址；在 Cloudflare Access 给网页地址建立仅允许本人邮箱的应用，并把该应用 issuer／audience 配到 API。如使用自定义域名，在 Web 配置添加对应 route，再调整 PUBLIC_ORIGIN。API 会独立校验 Access JWT，未配置登录不会开放个人学习数据。[Access JWT 验证](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)
+访问密码使用至少16字符的随机值，签名密钥至少32字符，均只存于 Secrets；账号内本次已配置四项 Secrets。云端 `AUTH_MODE=demo-password`，未正确配置密码与签名密钥时拒绝访问。登录检查同源 Origin，Cookie 使用 Secure、HttpOnly、SameSite=Strict，认证固定为唯一 demo 用户。个人密钥、密码文件和本地学习记录不会提交到 GitHub。
 
-如选择 Workers AI，改 `MODEL_PROVIDER=workers-ai`，填写支持 JSON 的准确模型名，在 API Wrangler 配置添加 `"ai":{"binding":"AI"}`，无需 MODEL_API_KEY／URL。[Workers AI binding](https://developers.cloudflare.com/workers-ai/configuration/bindings/)、[JSON mode](https://developers.cloudflare.com/workers-ai/features/json-mode/)。不要把固定演示回复当云端 AI。
+先部署 API，再部署 Web。首次迁移和两 Worker 上传均已成功；后续部署使用同一数据库，不删表重建。`GET /api/v1/readiness` 需要登录，展示实际供应商配置；`writable=not_probed` 本身不代表写入验证。真实学习内容质量和账户额度需单独检查。
 
-部署后重新打开网页，以本人登录新建两个项目、提交答案、暂停并刷新、导出文件，确认实际保存。`GET /api/v1/readiness` 需登录，显示配置状态；`writable=not_probed` 仅表示尚未写入探测，不能当作数据库写入验收。
+如以后选择 Cloudflare Access，可将 `AUTH_MODE` 改为 `access` 并配置 `ACCESS_ISSUER`、`ACCESS_AUDIENCE`、`ALLOWED_EMAIL`；当前 demo 不依赖这项服务。Workers AI 也保留为可选供应商，但本次使用 DeepSeek。
 
 ## 4. 当前限制
 
-- DeepSeek 与 Tavily 已完成本地真实链路验证，生成定义、资料地图、计划和任务卡；云端部署等待 Cloudflare 重新授权。内容质量仍需按实际学习项目检查。
+- DeepSeek 与 Tavily 已完成本地真实链路验证，生成定义、资料地图、计划和任务卡；云端已部署，密码登录已验证。内容质量仍需按实际学习项目检查。
 - 资料只使用搜索摘要与链接；安全全文读取 transport 未配置，不直接放开任意 URL fetch。
 - 每个 run 上限 8 次模型、12 次工具、6 次交接；外部请求 30 秒、模型输出 2,048 tokens、上下文 24,000 字符。超时可能已产生供应商费用，需要用户明确重试。
 - 不承诺全部免费；模型／搜索／Workers／D1／Agent 用量需在实际账户核对。不会自动升级付费。

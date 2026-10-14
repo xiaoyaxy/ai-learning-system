@@ -3,6 +3,9 @@ export interface Env {
   PROJECT_SUPERVISOR: DurableObjectNamespace;
   DEPLOYMENT_ENV: "local" | "cloud";
   DEV_OWNER_ID?: string;
+  AUTH_MODE?: "access" | "demo-password";
+  DEMO_ACCESS_PASSWORD?: string;
+  DEMO_SESSION_SECRET?: string;
   PUBLIC_ORIGIN?: string;
   ACCESS_ISSUER?: string;
   ACCESS_AUDIENCE?: string;

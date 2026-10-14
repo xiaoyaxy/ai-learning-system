@@ -49,6 +49,8 @@ export interface ProjectSummary {
   timezone: string;
 }
 export const api = {
+  login: (password: string) =>
+    request<{ status: string }>("/login", { password }),
   getSession: () =>
     request<{
       mode: string;

@@ -1,4 +1,5 @@
 import type { Env } from "../env";
+import { demoPasswordConfigured } from "../http/password";
 import { publicHttpsUrl } from "./source-reader";
 export function checkReadiness(env: Env) {
   const local = env.DEPLOYMENT_ENV === "local",
@@ -15,6 +16,8 @@ export function checkReadiness(env: Env) {
   } catch {
     authentication = false;
   }
+  if (!local && env.AUTH_MODE === "demo-password")
+    authentication = demoPasswordConfigured(env);
   const model =
     demo ||
     (!!env.MODEL_NAME &&

@@ -13,6 +13,7 @@ import { ApiError, publicError } from "./errors";
 import type { Env } from "../env";
 import { exportProject } from "../features/archive/export";
 import { checkReadiness } from "../providers/readiness";
+import { loginDemo } from "./password";
 export interface CommandDispatcher {
   accept(
     principal: Principal,
@@ -30,6 +31,9 @@ export function createApp(deps: {
     Variables: { principal: Principal };
   }>();
   app.get("/api/v1/health", (c) => c.json({ status: "ok" }));
+  app.post("/api/v1/login", async (c) =>
+    loginDemo(c.req.raw, c.env, await readJson(c.req.raw)),
+  );
   app.use("/api/v1/*", async (c, next) => {
     const principal = await authenticate(c.req.raw, c.env);
     c.set("principal", principal);

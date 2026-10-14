@@ -1006,3 +1006,21 @@ details summary {
 .current-plan .artifact-document {
   margin-top: 12px;
 }
+
+.demo-login {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(320px, 100%);
+  text-align: left;
+}
+.demo-login input {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+}
+.demo-login [role="alert"] {
+  color: #b42318;
+  margin: 0;
+}
