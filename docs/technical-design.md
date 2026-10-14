@@ -97,7 +97,7 @@ tests/e2e/                         跨前后端验收
 
 ### 2.2 兼容验证
 
-拟使用 npm workspaces、Node.js 22 LTS 开发工具、TypeScript strict；Workers compatibility_date 固定为 `2026-10-14`，SDK 所需兼容标志在 T01 根据实际类型与本地运行核对。依赖版本在 T01 选定兼容组合并提交 package-lock.json，不以文档中的“最新”代替版本锁定。
+拟使用 npm workspaces、Node.js 22 LTS 开发工具、TypeScript strict；Workers compatibility_date 固定为 `2026-10-13`，SDK 所需兼容标志在 T01 根据实际类型与本地运行核对。依赖版本在 T01 选定兼容组合并提交 package-lock.json，不以文档中的“最新”代替版本锁定。
 
 T01 证明三件事：父子 RPC 可以调用；持久调度回调可以重新读取检查点；Web Worker 的 Service Binding 可以访问 API Worker。失败时保留 Cloudflare Agents SDK 与 D1 约束，修正兼容配置；不得悄悄更换框架。
 

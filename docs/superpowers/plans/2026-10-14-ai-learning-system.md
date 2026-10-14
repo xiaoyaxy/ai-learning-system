@@ -21,7 +21,7 @@
 - 日常调整可自主执行；可能影响用户明确目标时，先请示、后生效。
 - 项目相关考题答对至少 80% 是完成标准；初稿、终稿不增加额外完成门槛。
 - 前后端分离，Cloudflare 一体部署，Cloudflare Agents SDK、D1，免费方案优先。
-- Workers compatibility_date 固定为 `2026-10-14`，依赖精确版本在 T01 验证后写入 package-lock.json。
+- Workers compatibility_date 固定为 `2026-10-13`，依赖精确版本在 T01 验证后写入 package-lock.json。
 - 单次 run 最多 8 次模型请求、12 次业务工具调用、6 次专家交接；最多 2 次单步骤自动重试（额外尝试），单次外部请求超时 30 秒；输出上限 2,048 tokens；一个步骤最多读取 8,000 字符来源片段。
 - 单页消息／事件最多 50 条；正文限制 12,000 Unicode 字符，请求体限制 64 KiB。
 - 未确认评分政策不得自动判定 met；未配置生产鉴权不得开放个人数据；不得自动升级付费。
@@ -107,7 +107,7 @@ expect((await web.fetch('/api/v1/health')).status).toBe(200);
 ```
 
 - [ ] **Step 3：运行失败测试。** `npm test --workspace packages/contracts -- commands.test.ts`、`npm test --workspace apps/api -- platform.test.ts`；预期缺失实现或断言失败，不把配置／导入错误当作有效红灯。
-- [ ] **Step 4：实现最小平台连接与契约。** 导出 Agent 类、配置 SQLite migration、静态资源与 `/api/*` 转发、健康路由；在测试 fixture 内定义 child、scheduledResult、web。兼容日期固定 2026-10-14；以选定 SDK 类型确认 subAgent 与 schedule 的参数，不凭旧样例推断。
+- [ ] **Step 4：实现最小平台连接与契约。** 导出 Agent 类、配置 SQLite migration、静态资源与 `/api/*` 转发、健康路由；在测试 fixture 内定义 child、scheduledResult、web。兼容日期固定 2026-10-13；以选定 SDK 类型确认 subAgent 与 schedule 的参数，不凭旧样例推断。
 - [ ] **Step 5：验证并记录。** 上述测试全部 PASS；`npm run typecheck` 与 `npm run build` 成功。docs/compatibility.md 记录精确版本、SDK 接口、兼容标志、测试命令与真实结果。兼容未通过不得推进依赖任务。
 - [ ] **Step 6：提交。** `git add package.json package-lock.json tsconfig.base.json README.md apps/web apps/api packages/contracts docs/compatibility.md`；`git commit -m "chore: verify Cloudflare workspace and contracts"`。仅暂存本任务新建的应用目录，不包含 prototype/ 和既有需求源文件。
 
