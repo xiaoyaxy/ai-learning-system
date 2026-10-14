@@ -2,19 +2,31 @@
   "name": "ai-learning-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-13",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "vars": {
-    "DEPLOYMENT_ENV": "local"
+    "DEPLOYMENT_ENV": "local",
   },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "ai-learning-local",
       "database_id": "00000000-0000-0000-0000-000000000001",
-      "migrations_dir": "src/db/migrations"
-    }
-  ]
+      "migrations_dir": "src/db/migrations",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PROJECT_SUPERVISOR",
+        "class_name": "ProjectSupervisor",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ProjectSupervisor"],
+    },
+  ],
 }
