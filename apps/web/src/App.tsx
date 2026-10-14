@@ -15,7 +15,7 @@ import {
   type Lesson,
 } from "./features/learning/materials";
 import { DemoLogin } from "./features/auth/DemoLogin";
-import { HandoffFeed } from "./features/chat/HandoffFeed";
+import { HandoffFeed, placeHandoffs } from "./features/chat/HandoffFeed";
 import { CurrentPlan } from "./features/planning/CurrentPlan";
 import { SubmissionCard } from "./features/archive/SubmissionCard";
 import { artifactNames } from "./lib/labels";
@@ -380,6 +380,7 @@ function Workspace({
     />
   );
   const run = w.active_run;
+  const handoffs = placeHandoffs(events, w.messages, run?.id ?? null);
   return (
     <>
       <main className="workspace">
@@ -494,7 +495,7 @@ function Workspace({
           <p className="conversation-caption">每一次理解，都留下真实记录</p>
           <LearningStages workspace={w} />
           <ResourceOverview workspace={w} onCourse={setLesson} />
-          <CurrentPlan workspace={w} />
+          <CurrentPlan workspace={w} onView={setArtifact} />
           {w.messages.length === 0 && (
             <div className="welcome-card">
               <h2>你的学习团队已就位</h2>
@@ -502,42 +503,54 @@ function Workspace({
             </div>
           )}
           {w.messages.map((m) => (
-            <article className={`message ${m.role}`} key={m.id}>
-              <span className={`avatar ${m.role}`}>
-                {m.role === "user"
-                  ? "我"
-                  : m.role === "system"
-                    ? "记"
-                    : roles[m.role].short}
-              </span>
-              <div>
-                <div className="message-meta">
-                  <strong>
-                    {m.role === "user"
-                      ? "我"
-                      : m.role === "system"
-                        ? "系统记录"
-                        : roles[m.role].name}
-                  </strong>
-                  <time>
-                    {new Intl.DateTimeFormat("zh-CN", {
-                      timeZone: w.project.timezone,
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    }).format(new Date(m.created_at))}
-                  </time>
+            <React.Fragment key={m.id}>
+              <HandoffFeed
+                events={handoffs.before[m.id] ?? []}
+                runId={run?.id ?? null}
+                roles={roles}
+              />
+              <article className={`message ${m.role}`}>
+                <span className={`avatar ${m.role}`}>
+                  {m.role === "user"
+                    ? "我"
+                    : m.role === "system"
+                      ? "记"
+                      : roles[m.role].short}
+                </span>
+                <div>
+                  <div className="message-meta">
+                    <strong>
+                      {m.role === "user"
+                        ? "我"
+                        : m.role === "system"
+                          ? "系统记录"
+                          : roles[m.role].name}
+                    </strong>
+                    <time>
+                      {new Intl.DateTimeFormat("zh-CN", {
+                        timeZone: w.project.timezone,
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }).format(new Date(m.created_at))}
+                    </time>
+                  </div>
+                  <div className="message-body">
+                    <MessageContent
+                      text={m.text}
+                      commandType={m.command_type}
+                      workspace={w}
+                      onLesson={setLesson}
+                    />
+                  </div>
                 </div>
-                <div className="message-body">
-                  <MessageContent
-                    text={m.text}
-                    commandType={m.command_type}
-                    workspace={w}
-                  />
-                </div>
-              </div>
-            </article>
+              </article>
+            </React.Fragment>
           ))}
-          <HandoffFeed events={events} runId={run?.id ?? null} roles={roles} />
+          <HandoffFeed
+            events={handoffs.after}
+            runId={run?.id ?? null}
+            roles={roles}
+          />
           {w.policy?.status === "draft" && (
             <div className="card policy">
               <span className="eyebrow">
@@ -764,7 +777,11 @@ function Workspace({
       )}
       {lesson && (
         <Dialog title="学习内容与资料" onClose={() => setLesson(null)}>
-          <LearningContent lesson={lesson} workspace={w} />
+          <LearningContent
+            lesson={lesson}
+            workspace={w}
+            artifact={w.artifacts.find((a) => a.id === lesson.artifact_id)}
+          />
         </Dialog>
       )}
       {archives && (
@@ -1037,14 +1054,16 @@ function CreateDialog({
   );
 }
 
-function MessageContent({
+export function MessageContent({
   text,
   commandType,
   workspace,
+  onLesson,
 }: {
   text: string;
   commandType?: string;
   workspace: WorkspaceDTO;
+  onLesson: (lesson: Lesson) => void;
 }) {
   const actions: Record<string, string> = {
     start_learning: "开始今天的学习",
@@ -1063,21 +1082,27 @@ function MessageContent({
   };
   if (commandType && actions[commandType])
     return <span className="user-action">{actions[commandType]}</span>;
+  if (text.startsWith("整体学习计划已生成："))
+    return <>{text.split("\n")[0]}</>;
   try {
     const value = JSON.parse(text);
-    if (typeof value.goal === "string" && Array.isArray(value.blocks))
+    if (typeof value.goal === "string" && Array.isArray(value.blocks)) {
+      const cardArtifact = workspace.artifacts.find(
+        (a) => a.kind === "task_card" && a.content === text,
+      );
       return (
         <div className="inline-task">
           <strong>今日学习安排</strong>
           <LearningContent
             lesson={value}
+            compact
+            onOpen={() => onLesson({ ...value, artifact_id: cardArtifact?.id })}
             workspace={workspace}
-            artifact={workspace.artifacts.find(
-              (a) => a.kind === "task_card" && a.content === text,
-            )}
+            artifact={cardArtifact}
           />
         </div>
       );
+    }
   } catch {}
   return <>{text}</>;
 }

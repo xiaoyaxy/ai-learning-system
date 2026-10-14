@@ -45,3 +45,34 @@ it("displays Beijing while preserving the standard timezone identifier", async (
     }).format(new Date("2026-10-14T00:00:00Z")),
   ).toBe("08");
 });
+
+it("keeps today's chat card short with source links and a separate full-content action", async () => {
+  const open = vi.fn();
+  render(
+    <LearningContent
+      compact
+      onOpen={open}
+      workspace={fixture}
+      lesson={{
+        goal: "学习工具调用",
+        material_ids: ["s1"],
+        blocks: [{ kind: "deep", activity: "完成受约束的工具接口" }],
+        output: "可运行代码",
+      }}
+    />,
+  );
+  expect(screen.getByText("学习工具调用")).toBeTruthy();
+  expect(screen.getByRole("link", { name: /Agent官方文档/ })).toBeTruthy();
+  for (const text of [
+    "使用受约束的函数与外部系统交互。",
+    "Agent由模型、工具与状态循环组成。",
+    "完成受约束的工具接口",
+    "你的产出：可运行代码",
+  ]) {
+    expect(screen.queryByText(text)).toBeNull();
+  }
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "查看今日学习内容" }));
+  expect(open).toHaveBeenCalledOnce();
+});

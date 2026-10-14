@@ -16,11 +16,13 @@ export function MaterialLinks({
   ids,
   workspace,
   summaries = false,
+  compact = false,
   artifact,
 }: {
   ids: string[];
   workspace: WorkspaceDTO;
   summaries?: boolean;
+  compact?: boolean;
   artifact?: PublicArtifactDTO;
 }) {
   const materials = resolveMaterials(
@@ -29,19 +31,23 @@ export function MaterialLinks({
     artifactMaterialScope(workspace, artifact),
   );
   return materials.length ? (
-    <div className="material-links">
+    <div
+      className={compact ? "material-links compact-links" : "material-links"}
+    >
       {materials.map((s) => (
         <section key={s.id}>
           <a href={s.url} target="_blank" rel="noopener noreferrer">
             {s.reference_no} · {s.title} ↗
           </a>
           {summaries && s.summary && <p className="preserve">{s.summary}</p>}
-          <small>
-            {new URL(s.url).hostname} ·{" "}
-            {s.verification_status === "verified"
-              ? "原文已核对"
-              : "检索摘要 · 原文待核对"}
-          </small>
+          {!compact && (
+            <small>
+              {new URL(s.url).hostname} ·{" "}
+              {s.verification_status === "verified"
+                ? "原文已核对"
+                : "检索摘要 · 原文待核对"}
+            </small>
+          )}
         </section>
       ))}
     </div>
@@ -53,11 +59,32 @@ export function LearningContent({
   lesson,
   workspace,
   artifact,
+  compact = false,
+  onOpen,
 }: {
   lesson: Lesson;
+  compact?: boolean;
+  onOpen?: () => void;
   workspace: WorkspaceDTO;
   artifact?: PublicArtifactDTO;
 }) {
+  if (compact)
+    return (
+      <div className="compact-learning">
+        <p>{lesson.goal}</p>
+        <MaterialLinks
+          ids={lesson.material_ids}
+          workspace={workspace}
+          artifact={artifact}
+          compact
+        />
+        {onOpen && (
+          <button className="content-link" onClick={onOpen}>
+            查看今日学习内容
+          </button>
+        )}
+      </div>
+    );
   const { concepts } = getLearningData(workspace),
     materials = resolveMaterials(
       lesson.material_ids,

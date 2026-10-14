@@ -2,7 +2,7 @@ import React from "react";
 import { afterEach, it, expect } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { PublicEvent } from "@learning/contracts";
-import { HandoffFeed } from "./HandoffFeed";
+import { HandoffFeed, placeHandoffs } from "./HandoffFeed";
 const roles = {
   supervisor: { name: "学务总管" },
   planner: { name: "规划师" },
@@ -57,4 +57,67 @@ it("does not show old collaboration when there is no current run", () => {
     <HandoffFeed events={[event(1, "old")]} runId={null} roles={roles} />,
   );
   expect(container.querySelector(".handoff")).toBeNull();
+});
+
+it("places the supervisor call before the matching planner reply, after the user's request", () => {
+  const events = [
+    event(2, "r", "安排今天的学习"),
+    {
+      ...event(3, "r"),
+      type: "message_committed",
+      role: "planner",
+      payload: { text: "今日计划" },
+    },
+  ] as PublicEvent[];
+  const messages = [
+    {
+      id: "u",
+      role: "user",
+      run_id: "r",
+      text: "开始",
+      created_at: "2026-10-14T08:00:00Z",
+    },
+    {
+      id: "p",
+      role: "planner",
+      run_id: "r",
+      text: "今日计划",
+      created_at: "2026-10-14T08:00:00Z",
+    },
+  ] as any;
+  const placed = placeHandoffs(events, messages, "r");
+  expect(placed.before.u).toBeUndefined();
+  expect(placed.before.p?.map((e) => e.seq)).toEqual([2]);
+  expect(placed.after).toHaveLength(0);
+});
+it("matches a later planner handoff to its later reply even when timestamps are equal", () => {
+  const events = [
+    event(1, "r", "明确学习范围"),
+    {
+      ...event(2, "r"),
+      type: "message_committed",
+      role: "planner",
+      payload: { text: "目标已明确" },
+    },
+    event(3, "r", "制定整体学习计划"),
+  ] as PublicEvent[];
+  const messages = [
+    {
+      id: "definition",
+      role: "planner",
+      run_id: "r",
+      text: "目标已明确",
+      created_at: "2026-10-14T08:00:00Z",
+    },
+    {
+      id: "plan",
+      role: "planner",
+      run_id: "r",
+      text: "整体计划",
+      created_at: "2026-10-14T08:00:00Z",
+    },
+  ] as any;
+  const placed = placeHandoffs(events, messages, "r");
+  expect(placed.before.definition?.map((e) => e.seq)).toEqual([1]);
+  expect(placed.before.plan?.map((e) => e.seq)).toEqual([3]);
 });

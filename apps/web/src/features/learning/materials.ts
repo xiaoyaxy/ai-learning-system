@@ -4,6 +4,7 @@ import type {
   WorkspaceDTO,
 } from "@learning/contracts";
 export interface Lesson {
+  artifact_id?: string;
   goal: string;
   material_ids: string[];
   output?: string;

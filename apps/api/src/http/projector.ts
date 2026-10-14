@@ -153,6 +153,7 @@ export function toWorkspaceDTO(r: WorkspaceRecord): WorkspaceDTO {
         }
       })(),
       id: m.id,
+      run_id: m.run_id,
       seq: m.seq,
       role: m.sender_role,
       text: m.body,

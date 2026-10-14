@@ -61,6 +61,7 @@ export const PublicEventSchema = z
   .strict();
 export type PublicEvent = z.infer<typeof PublicEventSchema>;
 export interface PublicMessage {
+  run_id?: string | null;
   command_type?: string;
   id: string;
   seq: number;

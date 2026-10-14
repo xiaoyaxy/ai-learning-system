@@ -436,6 +436,41 @@ test("整体计划等待确认、今日内容与资料链接、删除恢复和�
   );
   await expect(content).toContainText("学习内容");
   await content.getByRole("button", { name: "关闭对话框" }).click();
+  await expect(page.locator(".inline-task")).not.toContainText("知识管家整理");
+  await expect(page.locator(".inline-task .learning-content")).toHaveCount(0);
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const handoff = Array.from(
+            document.querySelectorAll(".conversation .handoff"),
+          ).find((e) => e.textContent?.includes("安排今天的学习"));
+          const card = document.querySelector(".inline-task");
+          return (
+            !!handoff &&
+            !!card &&
+            !!(
+              handoff.compareDocumentPosition(card) &
+              Node.DOCUMENT_POSITION_FOLLOWING
+            )
+          );
+        }),
+      { timeout: 15000 },
+    )
+    .toBe(true);
+  await page
+    .getByRole("button", { name: "查看完整学习计划", exact: true })
+    .click();
+  const fullPlan = page.getByRole("dialog", { name: /学习计划/ });
+  await expect(fullPlan).toContainText("时间约束");
+  await fullPlan.getByRole("button", { name: "关闭对话框" }).click();
+  await page
+    .getByRole("button", { name: "查看今日学习内容", exact: true })
+    .click();
+  const fullToday = page.getByRole("dialog", { name: "学习内容与资料" });
+  await expect(fullToday).toContainText("学习内容 · 知识管家整理");
+  await fullToday.getByRole("button", { name: "关闭对话框" }).click();
+
   await expect(page.locator(".workspace-header")).toContainText("Asia/Beijing");
   await page.getByRole("button", { name: "删除群", exact: true }).click();
   await page.getByRole("button", { name: "取消", exact: true }).click();

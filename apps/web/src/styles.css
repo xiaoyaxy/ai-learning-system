@@ -1175,3 +1175,33 @@ details summary {
   color: #777;
   font-size: 13px;
 }
+.compact-links section {
+  margin: 6px 0;
+}
+.compact-links a {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.plan-heading {
+  color: var(--primary);
+  font-weight: 600;
+}
+.current-plan > p {
+  font-size: 13px;
+  margin: 8px 0;
+}
+.content-link {
+  margin-top: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  padding: 4px 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+.content-link:hover {
+  text-decoration: underline;
+}
+.compact-learning {
+  line-height: 1.5;
+}
