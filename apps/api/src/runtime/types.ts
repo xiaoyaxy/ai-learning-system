@@ -14,6 +14,7 @@ export const RoleResultSchema = z
       })
       .strict()
       .nullable(),
+    request_id: z.string().optional(),
   })
   .strict();
 export type RoleResult = z.infer<typeof RoleResultSchema>;
@@ -26,6 +27,7 @@ export interface RoleTask {
   action: string;
   evidence_ids: string[];
   public_context: Record<string, unknown>;
+  private_context?: Record<string, unknown>;
 }
 export interface WorkStep {
   external_kind?: "model" | "tool";

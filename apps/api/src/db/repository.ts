@@ -492,6 +492,24 @@ export class ProjectRepository {
           .bind(...Object.values(v), ctx.project_id, id),
       );
     }
+    if (writes.policy_changes) {
+      if (ctx.actor !== "trusted_ingress")
+        throw new RepositoryError("FORBIDDEN");
+      const v = writes.policy_changes;
+      statements.push(
+        this.db
+          .prepare(
+            "UPDATE assessment_policies SET status=?,policy_json=?,confirmed_message_id=? WHERE project_id=? AND id=? AND status='draft'",
+          )
+          .bind(
+            v.status,
+            v.policy_json,
+            v.confirmed_message_id,
+            ctx.project_id,
+            v.id,
+          ),
+      );
+    }
     if (writes.provider_changes) {
       const { id, ...v } = writes.provider_changes;
       const ks = Object.keys(v);
@@ -580,12 +598,9 @@ export class ProjectRepository {
       rows<Record<string, RowValue>>("question_secrets"),
       rows<Record<string, RowValue>>("assessment_policies", "ORDER BY version"),
       rows<Record<string, RowValue>>("plan_proposals", "ORDER BY version"),
-      rows<Record<string, RowValue>>("assessment_sessions"),
-      rows<Record<string, RowValue>>("quiz_attempts"),
-      rows<Record<string, RowValue>>(
-        "quiz_evaluations",
-        "ORDER BY created_at,id",
-      ),
+      rows<Record<string, RowValue>>("assessment_sessions", "ORDER BY rowid"),
+      rows<Record<string, RowValue>>("quiz_attempts", "ORDER BY rowid"),
+      rows<Record<string, RowValue>>("quiz_evaluations", "ORDER BY rowid"),
       rows<Record<string, RowValue>>("review_schedule"),
       rows<Record<string, RowValue>>("sources"),
     ]);

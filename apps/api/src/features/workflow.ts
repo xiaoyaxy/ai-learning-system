@@ -8,6 +8,8 @@ import { ProjectRepository } from "../db/repository";
 import type { RoleExecutor } from "./planning/service";
 import { PlanningService } from "./planning/service";
 import { ApiError } from "../http/errors";
+import { AssessmentService } from "./assessment/service";
+import { toWorkspaceDTO } from "../http/projector";
 export async function runLearningCommand(
   repo: ProjectRepository,
   ctx: IngressContext,
@@ -30,6 +32,63 @@ export async function runLearningCommand(
       actor: "planner" as const,
       run_id: run.id,
     };
+  const assessment = new AssessmentService(repo, execute),
+    coachCtx = { ...toolCtx, actor: "coach" as const };
+  if (
+    command.type === "start_practice" ||
+    command.type === "start_completion_check"
+  ) {
+    await assessment.start(
+      coachCtx,
+      command.type === "start_practice" ? "practice" : "completion",
+    );
+    return true;
+  }
+  if (command.type === "confirm_assessment_policy") {
+    await assessment.confirmPolicy(coachCtx, command);
+    return true;
+  }
+  if (
+    command.type === "submit_answer" ||
+    (command.type === "send_message" && command.mode === "answer")
+  ) {
+    if (
+      command.type === "send_message" &&
+      command.target_role &&
+      command.target_role !== "coach" &&
+      command.target_role !== "supervisor"
+    )
+      throw new ApiError("ANSWER_PENDING", 409);
+    const q = toWorkspaceDTO(w).question;
+    // Replayed runs can already have saved their answer while evaluation is pending.
+    const previous = w.attempts.find((a) =>
+      w.messages.some(
+        (m) => m.id === a.answer_message_id && m.run_id === run.id,
+      ),
+    );
+    const input =
+      command.type === "submit_answer"
+        ? command
+        : q
+          ? {
+              question_id: q.id,
+              question_version: q.version,
+              attempt_index: q.attempt_index,
+              text: command.text,
+            }
+          : previous
+            ? {
+                question_id: String(previous.question_id),
+                question_version: 1,
+                attempt_index: Number(previous.attempt_index),
+                text: command.text,
+              }
+            : null;
+    if (!input) throw new ApiError("INVALID_STAGE", 409);
+    const attempt = await assessment.submit(coachCtx, input);
+    await assessment.evaluate(coachCtx, attempt);
+    return true;
+  }
   if (
     command.type === "send_message" &&
     w.project.phase === "scoping" &&

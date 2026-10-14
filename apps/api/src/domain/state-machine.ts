@@ -15,14 +15,14 @@ export function transition(
     "supplement_requirements",
   ];
   if (control.includes(command.type)) return { allowed: true };
+  if (command.type === "request_stage_jump")
+    return { allowed: true, phase: command.phase, skipped: true };
   if (
     state.pending_kind === "answer" &&
     command.type !== "submit_answer" &&
     !(command.type === "send_message" && command.mode === "answer")
   )
     return { allowed: false, code: "ANSWER_PENDING" };
-  if (command.type === "request_stage_jump")
-    return { allowed: true, phase: command.phase, skipped: true };
   if (
     command.type === "start_completion_check" &&
     ["scoping", "diagnosis", "preparing"].includes(state.phase)

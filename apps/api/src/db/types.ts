@@ -113,6 +113,12 @@ export interface EntityWrite {
   row: Record<string, RowValue>;
 }
 export interface StepWriteSet {
+  policy_changes?: {
+    id: string;
+    status: string;
+    policy_json: string;
+    confirmed_message_id: string;
+  };
   entities?: EntityWrite[];
   events?: {
     type: string;

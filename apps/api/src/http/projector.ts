@@ -6,6 +6,8 @@ import {
   type PendingInput,
 } from "@learning/contracts";
 import type { WorkspaceRecord, EventRecord } from "../db/types";
+export const publicTimestamp = (s: string) =>
+  s.includes("T") ? s : s.replace(" ", "T") + "Z";
 const decode = <T>(s: string | null, fallback: T): T => {
   try {
     return s ? (JSON.parse(s) as T) : fallback;
@@ -25,6 +27,11 @@ export function toWorkspaceDTO(r: WorkspaceRecord): WorkspaceDTO {
     .reverse()
     .find((x) => x.status === "pending");
   const policy = r.policies.at(-1);
+  const attempts = r.attempts.filter((a) => a.question_id === question?.id);
+  const evaluation = r.evaluations
+    .filter((e) => e.attempt_id === attempts.at(-1)?.id)
+    .at(-1);
+  const canAnswer = attempts.length === 0 || !!evaluation?.followup;
   return {
     project: {
       id: p.id,
@@ -41,21 +48,23 @@ export function toWorkspaceDTO(r: WorkspaceRecord): WorkspaceDTO {
     active_run: run
       ? { id: run.id, status: run.status, error_code: run.error_code }
       : null,
-    question: question
-      ? {
-          id: String(question.id),
-          version: Number(question.version),
-          prompt: String(question.prompt),
-          attempt_index:
-            r.attempts.filter((a) => a.question_id === question.id).length + 1,
-        }
-      : null,
+    question:
+      question && canAnswer
+        ? {
+            id: String(question.id),
+            version: Number(question.version),
+            prompt: String(evaluation?.followup ?? question.prompt),
+            attempt_index:
+              r.attempts.filter((a) => a.question_id === question.id).length +
+              1,
+          }
+        : null,
     messages: r.messages.map((m) => ({
       id: m.id,
       seq: m.seq,
       role: m.sender_role,
       text: m.body,
-      created_at: m.created_at,
+      created_at: publicTimestamp(m.created_at),
     })),
     artifacts: r.artifacts
       .filter((a) => !a.tombstone)
@@ -64,7 +73,7 @@ export function toWorkspaceDTO(r: WorkspaceRecord): WorkspaceDTO {
         kind: a.kind,
         version: a.version,
         content: a.content,
-        created_at: a.created_at,
+        created_at: publicTimestamp(a.created_at),
       })),
     latest_seq: r.latest_seq,
     completion: decode<CompletionEvidenceDTO>(p.completion_json, {
@@ -96,7 +105,7 @@ export function toWorkspaceDTO(r: WorkspaceRecord): WorkspaceDTO {
 }
 function policySummary(json: string) {
   const p = decode<Record<string, unknown>>(json, {});
-  return `题数：${p.question_count ?? "待定"}；口径：${p.attempt_basis ?? "待定"}；部分正确：${p.partial_rule ?? "待定"}；完成标准：80%`;
+  return JSON.stringify({ ...p, threshold_percent: 80 }, null, 2);
 }
 export function toPublicEvent(r: EventRecord): PublicEvent {
   const raw = decode<Record<string, unknown>>(r.payload_json, {});
@@ -111,7 +120,7 @@ export function toPublicEvent(r: EventRecord): PublicEvent {
     type: r.type,
     run_id: r.run_id,
     role: r.role,
-    occurred_at: r.occurred_at,
+    occurred_at: publicTimestamp(r.occurred_at),
     payload,
   });
 }
