@@ -148,6 +148,26 @@ small {
   letter-spacing: 0.16em;
   font-size: 10px;
 }
+.project-introduction {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px;
+  margin: -18px 0 16px;
+  color: var(--primary);
+  font-size: 12px;
+  text-decoration: none;
+}
+.project-introduction:hover {
+  text-decoration: underline;
+}
+.project-introduction:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.login-introduction {
+  margin: 16px 0 0;
+}
 .sidebar-heading {
   display: flex;
   align-items: center;
@@ -722,6 +742,11 @@ details summary {
   .brand small {
     display: none;
   }
+  .sidebar > .project-introduction {
+    flex-shrink: 0;
+    padding: 4px 0;
+    margin: 0;
+  }
   .sidebar-heading,
   .project-list,
   .sidebar-note,
@@ -1142,6 +1167,15 @@ details summary {
   color: #767086;
   background: transparent;
   border: 0;
+}
+@media (max-width: 799px) {
+  .sidebar > .trash-button {
+    width: auto;
+    max-width: 64px;
+    flex-shrink: 0;
+    padding: 4px;
+    font-size: 11px;
+  }
 }
 .delete-actions {
   display: flex;

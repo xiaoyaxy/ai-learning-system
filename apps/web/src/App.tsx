@@ -123,6 +123,9 @@ export function App() {
             <small>LEARNING CIRCLE</small>
           </div>
         </a>
+        <a className="project-introduction" href="/introduction.html">
+          项目介绍 ↗
+        </a>
         <div className="sidebar-heading">
           <span>我的学习群</span>
           <button aria-label="新建学习群" onClick={() => setCreate(true)}>

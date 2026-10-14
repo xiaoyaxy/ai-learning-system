@@ -41,6 +41,12 @@ export function DemoLogin({ onSuccess }: { onSuccess: () => void }) {
           {pending ? "正在进入…" : "进入学习群"}
         </button>
       </form>
+      <a
+        className="project-introduction login-introduction"
+        href="/introduction.html"
+      >
+        先了解知行 · 查看项目介绍 →
+      </a>
     </main>
   );
 }

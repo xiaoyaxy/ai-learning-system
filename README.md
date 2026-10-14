@@ -2,6 +2,8 @@
 
 个人、多项目学习 demo：总管、规划师、知识管家和陪练官在群聊里协作。React + Hono + Cloudflare Agents SDK + D1，学习记录保存在后端，刷新页面可以继续。
 
+[项目介绍](https://ai-learning-web.syl-pi-agent.workers.dev/introduction.html)：一页展示四角色分工、六步协作流程与学习闭环。页面源文件为 `apps/web/public/introduction.html`，可独立打开，也随应用一起部署；无需登录即可查看。
+
 ## 快速跑起来
 
 需要 Node.js 24 和 npm 11。首次安装后，一条命令启动：
