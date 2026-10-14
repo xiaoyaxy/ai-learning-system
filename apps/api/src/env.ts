@@ -12,6 +12,7 @@ export interface Env {
   MODEL_NAME?: string;
   MODEL_API_KEY?: string;
   MODEL_API_URL?: string;
+  MODEL_THINKING?: "enabled" | "disabled";
   MODEL_TOKEN_PARAMETER?: "max_tokens" | "max_completion_tokens";
   AI?: Ai;
   SEARCH_PROVIDER?: string;

@@ -11,7 +11,7 @@ npm ci
 npm run demo
 ```
 
-打开 http://127.0.0.1:8787 。此模式无需账号或 API Key，使用明确标注的本地固定模型／搜索回复；数据库保存在 `.wrangler/demo`，与自动测试数据分开。它用于演示交互流程，不能据此判断真实 AI 教学质量。
+打开 http://127.0.0.1:8787 。未配置 `.dev.vars` 时无需账号或 API Key，使用明确标注的本地固定模型／搜索回复；数据库保存在 `.wrangler/demo`，与自动测试数据分开。固定回复用于演示交互流程，不能据此判断真实 AI 教学质量。若已有服务端 `.dev.vars` 配置，`npm run demo` 会使用指定的真实模型和搜索，并保留同一份本地数据。
 
 新建项目后，回答定题问题、提交起点诊断，再查看资料和计划。可以 @ 专家、练习／完成检验、修改检验政策、补充要求、暂停／继续，提交初稿／终稿、整理学习卡、复盘和导出 Markdown。完成检验需要你先确认政策，并覆盖完整题目后按 80% 门槛判断。
 
@@ -24,7 +24,7 @@ npm run migrate:local
 npm run dev
 ```
 
-默认适配 OpenAI 兼容 Chat Completions 接口和 Tavily 搜索；也提供 Workers AI binding 适配。模型需要支持 JSON 输出。密钥只放服务端 `.dev.vars` 或 Cloudflare secrets，这些文件不会提交。真实供应商尚未配置或验证。
+默认适配 OpenAI 兼容 Chat Completions 接口和 Tavily 搜索；也提供 Workers AI binding 适配。模型需要支持 JSON 输出。密钥只放服务端 `.dev.vars` 或 Cloudflare secrets，这些文件不会提交。支持 DeepSeek：模型 `deepseek-flash`、URL `https://api.deepseek.com/chat/completions`，可设 `MODEL_THINKING=disabled` 优先演示速度。密钥仍需各自配置。
 
 ## 检查与部署
 
@@ -47,3 +47,5 @@ npm run test:e2e
 - [需求](AI学习多Agent系统-岗位卡片.md)、[技术设计](docs/technical-design.md)、[实施计划](docs/superpowers/plans/2026-10-14-ai-learning-system.md)、[验收记录](docs/acceptance.md)。
 
 当前资料采集提供搜索摘要和链接；默认不抓取任意网页全文。学习卡引用用户实际表达，缺项会补问；成果审阅只给意见，保留原稿。未揭示参考答案不会出现在公开档案或导出里。
+
+本机需要网络代理时，可将现有 `HTTPS_PROXY`、`HTTP_PROXY` 和 `NODE_USE_ENV_PROXY=1` 放到被忽略的 `.env.proxy`；本地启动会自动读取。浏览器测试配置位于独立目录，不加载个人 `.dev.vars`。

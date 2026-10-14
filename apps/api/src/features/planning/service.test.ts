@@ -193,3 +193,28 @@ describe("planner learning outputs", () => {
     ).toEqual(["deep", "supplement", "reflection"]);
   });
 });
+
+it("supplies an actual JSON schema with separate scope alternatives to a live model", async () => {
+  const { repo, ctx, message } = await fixture({
+    kind: "question",
+    question: "服务哪个场景？",
+    missing_fields: ["scenario"],
+  });
+  let contract: any;
+  const service = new PlanningService(repo, async (task) => {
+    contract = task.public_context.output_contract;
+    return {
+      kind: "scope",
+      content: {
+        kind: "question",
+        question: "服务哪个场景？",
+        missing_fields: ["scenario"],
+      },
+      evidence_ids: [],
+      usage: null,
+    };
+  });
+  await service.scope(ctx, { message_id: message.id });
+  expect(contract.$schema).toContain("json-schema.org");
+  expect(contract.oneOf).toHaveLength(2);
+});

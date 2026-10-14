@@ -37,7 +37,7 @@ export async function providerJson(
           Authorization: `Bearer ${key}`,
         },
         body: JSON.stringify(body),
-        redirect: "error",
+        redirect: "manual",
         signal,
       });
     } catch {

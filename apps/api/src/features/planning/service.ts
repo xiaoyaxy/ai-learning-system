@@ -146,21 +146,7 @@ export class PlanningService {
             .filter((m) => m.sender_role === "user")
             .map((m) => ({ id: m.id, text: m.body })),
           clarification_count: w.project.scope_questions,
-          output_contract: {
-            kind: "question | definition",
-            question: "one question when facts missing",
-            missing_fields: ["missing fact names"],
-            definition: {
-              purpose: "string",
-              scope_in: ["string"],
-              scope_out: ["string"],
-              skills: ["string"],
-              first_draft_milestone: {
-                suggested_days: "1 or 2",
-                description: "string",
-              },
-            },
-          },
+          output_contract: z.toJSONSchema(ScopeSchema),
         },
       },
       async (step) => {
@@ -350,17 +336,7 @@ export class PlanningService {
               summary: s.summary,
             })),
           review_ids: input.review_ids,
-          output_contract: {
-            milestones: ["string"],
-            tasks: [
-              {
-                goal: "string",
-                skill_id: "definition skill",
-                material_ids: ["provided material ID"],
-                output: "user output",
-              },
-            ],
-          },
+          output_contract: z.toJSONSchema(PlanSchema),
         },
       },
       async (step) => {
@@ -445,16 +421,7 @@ export class PlanningService {
           plan: JSON.parse(plan.content),
           date: localDate,
           review_items: reviews,
-          output_contract: {
-            goal: "string",
-            material_ids: ["source id"],
-            output: "user output",
-            blocks: [
-              { kind: "deep", activity: "string" },
-              { kind: "supplement", activity: "string" },
-              { kind: "reflection", activity: "string" },
-            ],
-          },
+          output_contract: z.toJSONSchema(CardSchema),
         },
       },
       async (step) => {

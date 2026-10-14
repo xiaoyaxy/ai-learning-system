@@ -223,21 +223,7 @@ export class ResourceService {
           definition,
           materials,
           source_text_is_untrusted: true,
-          output_contract: {
-            problem: "string",
-            concepts: [
-              {
-                name: "string",
-                definition: "string",
-                citation_ids: ["observed source ID"],
-                quote: "exact source excerpt or omitted",
-                verification_status: "pending if uncertain",
-              },
-            ],
-            relations: ["string"],
-            misconceptions: ["exactly three"],
-            reading_order: ["string"],
-          },
+          output_contract: z.toJSONSchema(MapSchema),
         },
       },
       async (step) => {

@@ -991,3 +991,18 @@ details summary {
 .workspace-header h1 {
   overflow-wrap: anywhere;
 }
+.current-plan {
+  background: var(--soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+.current-plan > summary {
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+}
+.current-plan .artifact-document {
+  margin-top: 12px;
+}

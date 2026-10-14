@@ -25,9 +25,9 @@ npm run dev
 
 适配协议：[JSON mode](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=chat)、[Tavily search](https://docs.tavily.com/documentation/api-reference/endpoint/search)。输出还需要通过应用 schema 校验；用量仅采用供应商实际返回的数据，缺失显示未知。
 
-## 3. 一个 Cloudflare demo 环境（可选）
+## 3. 一个 Cloudflare demo 环境
 
-尚未执行下列部署，需要自己的 Cloudflare 账号与配置。
+按用户要求部署到单一 Cloudflare demo 环境。目前正在恢复账号授权；授权完成后创建 D1、应用迁移、配置 Secrets，并部署两个 Worker。
 
 ```sh
 npx wrangler login
@@ -53,8 +53,16 @@ npm run deploy
 
 ## 4. 当前限制
 
-- 当前未接入真实模型／搜索、未部署云端，固定流程测试与真实教学质量分别记录。
+- DeepSeek 与 Tavily 已完成本地真实链路验证，生成定义、资料地图、计划和任务卡；云端部署等待 Cloudflare 重新授权。内容质量仍需按实际学习项目检查。
 - 资料只使用搜索摘要与链接；安全全文读取 transport 未配置，不直接放开任意 URL fetch。
 - 每个 run 上限 8 次模型、12 次工具、6 次交接；外部请求 30 秒、模型输出 2,048 tokens、上下文 24,000 字符。超时可能已产生供应商费用，需要用户明确重试。
 - 不承诺全部免费；模型／搜索／Workers／D1／Agent 用量需在实际账户核对。不会自动升级付费。
 - 云端迁移是追加式；回滚应用版本时保留现有数据库和答题／诊断历史，不执行删表重建。
+
+## DeepSeek 与本地代理
+
+服务端可设置 `MODEL_NAME=deepseek-flash`、`MODEL_API_URL=https://api.deepseek.com/chat/completions`、`MODEL_THINKING=disabled`。JSON 输出和可选 thinking 参数按 [DeepSeek JSON 文档](https://api-docs.deepseek.com/guides/json_mode/) 与 [thinking 文档](https://api-docs.deepseek.com/guides/thinking_mode/) 实现；其他兼容供应商未配置该选项时不会收到 thinking 参数。
+
+如果本机联网依赖代理，将已有的 HTTP(S)_PROXY 和 NODE_USE_ENV_PROXY=1 写入根目录 `.env.proxy`（已忽略），本地 Node 启动会读取；此配置不进入 Cloudflare 部署。自动浏览器测试使用 tests/e2e/workers 配置目录，与个人密钥目录分开。
+
+Tavily 使用基础搜索：[免费档每月1,000 credits，基础搜索每次1 credit](https://docs.tavily.com/documentation/api-credits)。配置 SEARCH_PROVIDER=tavily、SEARCH_API_KEY 后自动采集资料摘要与链接；全文安全提取仍未配置。

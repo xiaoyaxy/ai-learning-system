@@ -1,3 +1,4 @@
+import { CurrentPlan } from "./features/planning/CurrentPlan";
 import { SubmissionCard } from "./features/archive/SubmissionCard";
 import { artifactNames } from "./lib/labels";
 import { Dialog } from "./components/Dialog";
@@ -307,6 +308,14 @@ function Workspace({ projectId }: { projectId: string }) {
             本地演示 · 模型和搜索使用测试数据，记录保存在本地
           </div>
         )}
+        {session.data?.mode === "configured" && session.data.model && (
+          <div className="demo-banner">
+            当前模型：{session.data.model} ·{" "}
+            {session.data.search === "tavily"
+              ? "联网搜索已配置"
+              : "联网搜索尚未配置；已有资料仍可查阅"}
+          </div>
+        )}
         <div className="stage">
           <span className="status-dot" />
           <strong>{phases[w.phase]}</strong>
@@ -317,7 +326,10 @@ function Workspace({ projectId }: { projectId: string }) {
                 ? "下一步 · 你独立回答"
                 : run?.status === "waiting_decision"
                   ? "下一步 · 你确认安排"
-                  : "下一步 · 继续交流"}
+                  : w.phase === "learning" &&
+                      w.artifacts.some((a) => a.kind === "task_card")
+                    ? "下一步 · 按今日安排学习，准备好后开始独立练习"
+                    : "下一步 · 继续交流"}
           </span>
           <span className="connection">
             {status === "offline" ? "连接中断 · 草稿保留" : "已连接"}
@@ -340,6 +352,7 @@ function Workspace({ projectId }: { projectId: string }) {
         )}
         <div className="conversation" aria-label="学习群消息">
           <p className="conversation-caption">每一次理解，都留下真实记录</p>
+          <CurrentPlan workspace={w} />
           {w.messages.length === 0 && (
             <div className="welcome-card">
               <h2>你的学习团队已就位</h2>

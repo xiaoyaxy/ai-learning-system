@@ -1,0 +1,28 @@
+{
+  "name": "ai-learning-api-e2e",
+  "main": "../../../apps/api/src/index.ts",
+  "compatibility_date": "2026-10-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "vars": {
+    "DEPLOYMENT_ENV": "local",
+    "DEV_OWNER_ID": "local-e2e-user",
+    "DEMO_MODE": "true",
+    "DEMO_STEP_DELAY_MS": "1000",
+    "PUBLIC_ORIGIN": "http://127.0.0.1:8787",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ai-learning-e2e",
+      "database_id": "00000000-0000-0000-0000-000000000002",
+      "migrations_dir": "../../../apps/api/src/db/migrations",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "PROJECT_SUPERVISOR", "class_name": "ProjectSupervisor" },
+    ],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ProjectSupervisor"] }],
+}

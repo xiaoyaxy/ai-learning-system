@@ -49,7 +49,13 @@ export interface ProjectSummary {
   timezone: string;
 }
 export const api = {
-  getSession: () => request<{ mode: string; environment: string }>("/session"),
+  getSession: () =>
+    request<{
+      mode: string;
+      environment: string;
+      model?: string | null;
+      search?: string;
+    }>("/session"),
   listProjects: () => request<ProjectSummary[]>("/projects"),
   createProject: (p: CreateProjectInput) =>
     request<{ id: string; revision: number }>("/projects", p),

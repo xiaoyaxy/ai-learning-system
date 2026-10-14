@@ -124,7 +124,7 @@ it("never gives private grading context to another role or follows API redirects
   await new ConfiguredModelGateway(configured, { fetch: call }).generate(
     request,
   );
-  expect(call.mock.calls[0][1]).toMatchObject({ redirect: "error" });
+  expect(call.mock.calls[0][1]).toMatchObject({ redirect: "manual" });
   expect(JSON.parse(String(call.mock.calls[0][1]?.body))).toMatchObject({
     model: "test-model",
     max_tokens: 2048,
@@ -192,7 +192,7 @@ it("searches only the fixed selected endpoint and leaves unsafe hits out", async
   ).search("Agent 入门", { project_id: "p", goal_version: 1 });
   expect(hits).toHaveLength(1);
   expect(call.mock.calls[0][0]).toBe("https://api.tavily.com/search");
-  expect(call.mock.calls[0][1]).toMatchObject({ redirect: "error" });
+  expect(call.mock.calls[0][1]).toMatchObject({ redirect: "manual" });
   await expect(
     new ConfiguredSearchProvider(
       { DEPLOYMENT_ENV: "cloud", DEMO_MODE: "true" } as Env,
@@ -325,4 +325,62 @@ it("rejects invalid routing and empty replies before they can enter the replay c
       }),
     }).generate(request),
   ).rejects.toMatchObject({ code: "MODEL_INVALID_RESULT" });
+});
+
+it("passes an explicit DeepSeek thinking setting without changing other compatible providers", async () => {
+  const call = vi.fn<typeof fetch>(response());
+  await new ConfiguredModelGateway(
+    { ...configured, MODEL_THINKING: "disabled" } as Env,
+    { fetch: call },
+  ).generate(request);
+  expect(JSON.parse(String(call.mock.calls[0][1]?.body))).toMatchObject({
+    thinking: { type: "disabled" },
+  });
+  const normal = vi.fn<typeof fetch>(response());
+  await new ConfiguredModelGateway(configured, { fetch: normal }).generate(
+    request,
+  );
+  expect(JSON.parse(String(normal.mock.calls[0][1]?.body))).not.toHaveProperty(
+    "thinking",
+  );
+});
+
+it("uses Workers-supported manual redirects and rejects redirect responses without following them", async () => {
+  const nativeStyle = vi.fn<typeof fetch>(async (_url, init) => {
+    if (init?.redirect === "error")
+      throw new TypeError(
+        "Invalid redirect value: Workers supports follow or manual",
+      );
+    return response()();
+  });
+  await expect(
+    new ConfiguredModelGateway(configured, { fetch: nativeStyle }).generate(
+      request,
+    ),
+  ).resolves.toMatchObject({ kind: "message" });
+  const redirected = vi.fn<typeof fetch>(
+    async () =>
+      new Response("", {
+        status: 302,
+        headers: { Location: "https://other.example.com" },
+      }),
+  );
+  await expect(
+    new ConfiguredModelGateway(configured, { fetch: redirected }).generate(
+      request,
+    ),
+  ).rejects.toMatchObject({ code: "PROVIDER_UNAVAILABLE" });
+  expect(redirected).toHaveBeenCalledTimes(1);
+});
+
+it("gives the model a complete envelope schema with a fixed outer kind", async () => {
+  const call = vi.fn<typeof fetch>(response());
+  await new ConfiguredModelGateway(configured, { fetch: call }).generate(
+    request,
+  );
+  const body = JSON.parse(String(call.mock.calls[0][1]?.body));
+  expect(body.messages[0].content).toContain('"kind":{"const":"message"}');
+  expect(body.messages[0].content).toContain(
+    '"required":["kind","content","evidence_ids"]',
+  );
 });

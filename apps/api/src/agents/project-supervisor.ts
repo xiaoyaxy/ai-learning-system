@@ -1,3 +1,4 @@
+import { buildChatContext } from "../features/chat-context";
 import { parseMention } from "@learning/contracts";
 import { runLearningCommand } from "../features/workflow";
 import { Agent } from "agents";
@@ -349,7 +350,11 @@ export class ProjectSupervisor extends Agent<Env, RuntimeState> {
           key: "route",
           role: "supervisor",
           action: { type: "route" },
-          input: { text: cmd.text, phase: w.project.phase },
+          input: {
+            text: cmd.text,
+            phase: w.project.phase,
+            project_context: buildChatContext(w),
+          },
         },
         (step) =>
           this.executeTask({
@@ -398,7 +403,11 @@ export class ProjectSupervisor extends Agent<Env, RuntimeState> {
         key: "reply",
         role,
         action,
-        input: { text: cmd.text, phase: w.project.phase },
+        input: {
+          text: cmd.text,
+          phase: w.project.phase,
+          project_context: buildChatContext(w),
+        },
       },
       (step) =>
         this.executeTask({

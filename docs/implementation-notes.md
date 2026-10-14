@@ -1,6 +1,6 @@
 # 实施决策与审阅记录
 
-本轮按用户最新指示交付可快速运行的 demo：一个本地启动命令、一个可选云环境，无 staging／production。真实模型、在线部署和额度验证未运行。
+当前目标为可快速运行的 demo：一个本地启动命令、一个 Cloudflare 云环境，无 staging／production。最新指示要求真实 DeepSeek、Tavily 和云端部署；本地真实计划生成链路已验证，云端等待账号重新授权。
 
 ## Final review
 
@@ -38,3 +38,7 @@
 
 - Cloud authentication expiry is shown as connection interruption with cached workspace; add explicit login recovery before broader cloud use.
 - Markdown export should reject a login page returned as HTML200; current local demo has no authentication redirect.
+
+## 后续接入与部署
+
+2026-10-14：用户提供 DeepSeek 与 Tavily 配置，并明确要求部署到 Cloudflare。此前“云部署不在本轮范围”的决策已被最新指示替代。密钥仅保存在忽略的服务端文件，云端将使用 Cloudflare Secrets。已通过109项自动测试、typecheck、build与9项隔离浏览器流程；真实链路另生成了定义、知识地图、5项任务计划和任务卡。Cloudflare 现有 OAuth 过期，授权页面已交给用户登录。

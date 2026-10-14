@@ -8,6 +8,8 @@ MODEL_API_URL=
 MODEL_API_KEY=
 # Use max_completion_tokens if the selected endpoint requires that parameter.
 MODEL_TOKEN_PARAMETER=max_tokens
+# DeepSeek: use disabled for a faster demo; omit for other providers.
+# MODEL_THINKING=disabled
 SEARCH_PROVIDER=tavily
 SEARCH_API_KEY=
 DEMO_MODE=false
