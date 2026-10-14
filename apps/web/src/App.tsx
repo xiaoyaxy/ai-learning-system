@@ -146,7 +146,7 @@ export function App() {
           </div>
         </div>
       </aside>
-      {projects.error ? (
+      {projects.error && !projects.data ? (
         <div className="empty">
           <h1>暂时无法打开学习空间</h1>
           <p role="alert">{projects.error.message}</p>

@@ -145,11 +145,12 @@ test("项目群聊：断网草稿保留和重新连接", async ({ page, context 
   await context.setOffline(false);
   await page.getByRole("button", { name: "发送", exact: true }).click();
   await expect(
-    page.getByText("这段起点诊断应该保留", { exact: true }),
+    page.getByLabel("学习群消息").getByText("这段起点诊断应该保留", { exact: true }),
   ).toBeVisible({ timeout: 30000 });
+  await expect(page.getByLabel('消息正文')).toHaveValue('');
   await page.reload();
   await expect(
-    page.getByText("这段起点诊断应该保留", { exact: true }),
+    page.getByLabel("学习群消息").getByText("这段起点诊断应该保留", { exact: true }),
   ).toBeVisible({ timeout: 30000 });
 });
 
