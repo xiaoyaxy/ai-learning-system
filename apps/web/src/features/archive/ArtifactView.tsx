@@ -226,7 +226,7 @@ function Sources({ sources }: { sources: any[] }) {
             <p>
               {href ? (
                 <a href={href} target="_blank" rel="noopener noreferrer">
-                  {s.reference_no} · {s.title}
+                  资料 {s.reference_no} · {s.title}
                 </a>
               ) : (
                 s.title

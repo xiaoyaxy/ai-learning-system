@@ -37,7 +37,7 @@ export function MaterialLinks({
       {materials.map((s) => (
         <section key={s.id}>
           <a href={s.url} target="_blank" rel="noopener noreferrer">
-            {s.reference_no} · {s.title} ↗
+            资料 {s.reference_no} · {s.title} ↗
           </a>
           {summaries && s.summary && <p className="preserve">{s.summary}</p>}
           {!compact && (
