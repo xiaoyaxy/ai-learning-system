@@ -146,6 +146,19 @@ test("项目群聊：窄屏布局、对话框焦点与 Escape", async ({ page })
       return !!box && box.y + box.height <= 900;
     })
     .toBe(true);
+  await expect
+    .poll(() =>
+      page
+        .locator(".project")
+        .first()
+        .evaluate((button) => {
+          const box = button.getBoundingClientRect(),
+            title = button.querySelector("strong")!.getBoundingClientRect(),
+            phase = button.querySelector("small")!.getBoundingClientRect();
+          return title.top >= box.top && phase.bottom <= box.bottom;
+        }),
+    )
+    .toBe(true);
   await page.setViewportSize({ width: 375, height: 900 });
   await page.getByRole("button", { name: "新建学习群", exact: true }).click();
   await expect(page.getByLabel("学习群名称")).toBeFocused();

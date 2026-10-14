@@ -166,6 +166,7 @@ small {
 }
 .project-list {
   display: grid;
+  grid-auto-rows: max-content;
   gap: 8px;
   flex: 1;
   min-height: 0;

@@ -4,7 +4,7 @@
 
 ## Final review
 
-独立只读整分支审阅发现0个Critical、4个Important、2个Minor。4个Important已通过失败复现→修复→全量验证：控制命令原子提交，多步消息恢复，笔记原操作重试，多项目视口布局。最终 typecheck、103项自动测试、build／Wrangler dry-run、9项浏览器流程通过；没有第二次审阅。
+独立只读整分支审阅发现0个Critical、4个Important、2个Minor。4个Important已通过失败复现→修复→全量验证：控制命令原子提交，多步消息恢复，笔记原操作重试，多项目视口布局（含截图发现的项目行压缩，并追加失败复现→通过检查）。最终 typecheck、103项自动测试、build／Wrangler dry-run、9项浏览器流程通过；没有第二次审阅。
 
 ## Rulings I made
 
