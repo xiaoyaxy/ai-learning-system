@@ -28,6 +28,7 @@ export interface RoleTask {
   public_context: Record<string, unknown>;
 }
 export interface WorkStep {
+  external_kind?: "model" | "tool";
   key: string;
   role: Role;
   action: ToolAction;

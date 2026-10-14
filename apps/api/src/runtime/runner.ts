@@ -96,9 +96,9 @@ export class TaskRunner {
         const budget = new BudgetTracker(
           JSON.parse(run.budget_json) as RunBudget,
         );
-        budget.consume("model");
+        if (step.external_kind !== "tool") budget.consume("model");
         budget.consume("tool");
-        budget.consume("handoff");
+        if (step.external_kind !== "tool") budget.consume("handoff");
         const p = await this.repo.getProject(ctx.owner_id, ctx.project_id);
         await this.repo.commitStep(
           {

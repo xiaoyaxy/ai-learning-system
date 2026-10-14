@@ -385,6 +385,7 @@ export class ProjectSupervisor extends Agent<Env, RuntimeState> {
         run,
         (task) => this.executeTask(task),
         cmd,
+        this.env,
       )
     )
       return;

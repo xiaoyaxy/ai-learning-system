@@ -149,6 +149,13 @@ export interface StepWriteSet {
     retry_count?: number;
     epoch?: number;
   };
+  source_changes?: {
+    id: string;
+    status: string;
+    summary?: string;
+    fetched_at?: string;
+    verification_status?: string;
+  };
   provider_changes?: {
     id: string;
     status: string;

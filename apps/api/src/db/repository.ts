@@ -469,6 +469,29 @@ export class ProjectRepository {
         )
         .bind(...Object.values(changes), ctx.project_id),
     );
+    if (writes.source_changes) {
+      const { id, ...v } = writes.source_changes;
+      const ks = Object.keys(v);
+      if (
+        ks.some(
+          (k) =>
+            ![
+              "status",
+              "summary",
+              "fetched_at",
+              "verification_status",
+            ].includes(k),
+        )
+      )
+        throw new RepositoryError("INVALID_FIELD");
+      statements.push(
+        this.db
+          .prepare(
+            `UPDATE sources SET ${ks.map((k) => `${k}=?`).join(",")} WHERE project_id=? AND id=?`,
+          )
+          .bind(...Object.values(v), ctx.project_id, id),
+      );
+    }
     if (writes.provider_changes) {
       const { id, ...v } = writes.provider_changes;
       const ks = Object.keys(v);
