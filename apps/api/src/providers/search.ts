@@ -17,6 +17,14 @@ export class ConfiguredSearchProvider implements SearchProvider {
     _query: string,
     _scope: { project_id: string; goal_version: number },
   ): Promise<SearchHit[]> {
+    if (this.env.DEPLOYMENT_ENV === "local" && this.env.DEMO_MODE === "true")
+      return [
+        {
+          title: "Cloudflare Agents（本地演示来源）",
+          url: "https://developers.cloudflare.com/agents/",
+          snippet: "本地演示用的资料链接，内容未实时抓取，请自行核对。",
+        },
+      ];
     throw new ApiError("CONFIGURATION_REQUIRED", 503);
   }
 }

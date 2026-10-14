@@ -16,4 +16,5 @@ export interface Env {
   SEARCH_PROVIDER?: string;
   SEARCH_API_KEY?: string;
   DEMO_MODE?: string;
+  DEMO_STEP_DELAY_MS?: string;
 }

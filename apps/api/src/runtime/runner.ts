@@ -124,7 +124,7 @@ export class TaskRunner {
                 type: "task_assigned",
                 role: "supervisor",
                 run_id: runId,
-                payload: { to: step.role, text: step.action.type },
+                payload: { to: step.role, text: toolLabel(step) },
               },
             ],
             run_changes: {
@@ -204,6 +204,18 @@ export class TaskRunner {
     try {
       const p = await this.repo.getProject(ctx.owner_id, ctx.project_id);
       if (p.run_epoch !== run.epoch) return;
+      const current = await this.repo.db
+        .prepare(
+          "SELECT epoch,status FROM agent_runs WHERE project_id=? AND id=?",
+        )
+        .bind(ctx.project_id, run.id)
+        .first<{ epoch: number; status: string }>();
+      if (
+        !current ||
+        current.epoch !== run.epoch ||
+        !["queued", "running"].includes(current.status)
+      )
+        return;
       await this.repo.commitStep(
         {
           ...ctx,
@@ -297,4 +309,27 @@ export class TaskRunner {
       },
     );
   }
+}
+function toolLabel(step: WorkStep) {
+  if (step.action.type === "write_artifact") {
+    const names: Record<string, string> = {
+      definition: "明确学习范围",
+      diagnosis: "保存原始诊断",
+      plan: "整理学习计划",
+      task_card: "安排今天的学习",
+      knowledge_map: "整理资料与知识地图",
+      learning_card: "整理真实学习表达",
+      weekly_report: "整理本周复盘",
+    };
+    return names[step.action.kind] ?? "整理学习记录";
+  }
+  const names: Record<string, string> = {
+    search: "查找权威资料",
+    read_source: "核对资料内容",
+    present_question: "准备独立练习",
+    grade_answer: "批改已保存的回答",
+    propose_plan: "依据反馈调整计划",
+    route: "协调学习伙伴",
+  };
+  return names[step.action.type] ?? "处理当前学习步骤";
 }

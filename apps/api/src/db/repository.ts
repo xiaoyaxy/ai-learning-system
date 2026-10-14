@@ -584,63 +584,55 @@ export class ProjectRepository {
     };
   }
   async readWorkspace(projectId: string): Promise<WorkspaceRecord> {
-    const project = await this.db
-      .prepare("SELECT * FROM projects WHERE id=?")
-      .bind(projectId)
-      .first<ProjectRecord>();
-    if (!project) throw new RepositoryError("FORBIDDEN");
-    const rows = async <T>(table: string, tail = "") =>
-      (
-        await this.db
+    // All reads share a D1 transaction: never pair a prior revision with newer facts.
+    const selections = [
+      ["messages", "ORDER BY seq DESC LIMIT 50"],
+      ["artifacts", "ORDER BY version"],
+      ["agent_runs", "ORDER BY created_at DESC"],
+      ["quiz_questions", ""],
+      ["question_secrets", ""],
+      ["assessment_policies", "ORDER BY version"],
+      ["plan_proposals", "ORDER BY version"],
+      ["assessment_sessions", "ORDER BY rowid"],
+      ["quiz_attempts", "ORDER BY rowid"],
+      ["quiz_evaluations", "ORDER BY rowid"],
+      ["review_schedule", ""],
+      ["sources", ""],
+    ];
+    const batch = await this.db.batch([
+      this.db.prepare("SELECT * FROM projects WHERE id=?").bind(projectId),
+      ...selections.map(([table, tail]) =>
+        this.db
           .prepare(`SELECT * FROM ${table} WHERE project_id=? ${tail}`)
-          .bind(projectId)
-          .all<T>()
-      ).results;
-    const values = await Promise.all([
-      rows<WorkspaceRecord["messages"][number]>(
-        "messages",
-        "ORDER BY seq DESC LIMIT 50",
+          .bind(projectId),
       ),
-      rows<WorkspaceRecord["artifacts"][number]>(
-        "artifacts",
-        "ORDER BY version",
-      ),
-      rows<WorkspaceRecord["runs"][number]>(
-        "agent_runs",
-        "ORDER BY created_at DESC",
-      ),
-      rows<Record<string, RowValue>>("quiz_questions"),
-      rows<Record<string, RowValue>>("question_secrets"),
-      rows<Record<string, RowValue>>("assessment_policies", "ORDER BY version"),
-      rows<Record<string, RowValue>>("plan_proposals", "ORDER BY version"),
-      rows<Record<string, RowValue>>("assessment_sessions", "ORDER BY rowid"),
-      rows<Record<string, RowValue>>("quiz_attempts", "ORDER BY rowid"),
-      rows<Record<string, RowValue>>("quiz_evaluations", "ORDER BY rowid"),
-      rows<Record<string, RowValue>>("review_schedule"),
-      rows<Record<string, RowValue>>("sources"),
+      this.db
+        .prepare(
+          "SELECT COALESCE(MAX(seq),0) AS seq FROM domain_events WHERE project_id=?",
+        )
+        .bind(projectId),
     ]);
-    const latest = await this.db
-      .prepare(
-        "SELECT COALESCE(MAX(seq),0) AS seq FROM domain_events WHERE project_id=?",
-      )
-      .bind(projectId)
-      .first<{ seq: number }>();
+    const project = batch[0].results[0] as unknown as ProjectRecord;
+    if (!project) throw new RepositoryError("FORBIDDEN");
+    const rows = batch.slice(1, -1).map((r) => r.results);
     return {
       project,
-      messages: values[0].reverse(),
-      artifacts: values[1],
-      runs: values[2],
-      questions: values[3],
-      secrets: values[4],
-      policies: values[5],
-      proposals: values[6],
-      sessions: values[7],
-      attempts: values[8],
-      evaluations: values[9],
-      reviews: values[10],
-      sources: values[11],
-      latest_seq: latest?.seq ?? 0,
-    };
+      messages: rows[0].reverse(),
+      artifacts: rows[1],
+      runs: rows[2],
+      questions: rows[3],
+      secrets: rows[4],
+      policies: rows[5],
+      proposals: rows[6],
+      sessions: rows[7],
+      attempts: rows[8],
+      evaluations: rows[9],
+      reviews: rows[10],
+      sources: rows[11],
+      latest_seq: Number(
+        (batch.at(-1)!.results[0] as { seq: number } | undefined)?.seq ?? 0,
+      ),
+    } as unknown as WorkspaceRecord;
   }
   async readEvents(
     projectId: string,

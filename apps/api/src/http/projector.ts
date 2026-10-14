@@ -60,6 +60,18 @@ export function toWorkspaceDTO(r: WorkspaceRecord): WorkspaceDTO {
           }
         : null,
     messages: r.messages.map((m) => ({
+      ...(() => {
+        try {
+          const command = JSON.parse(
+            r.runs.find((run) => run.id === m.run_id)?.command_json ?? "null",
+          );
+          return m.sender_role === "user" && command && !("text" in command)
+            ? { command_type: String(command.type) }
+            : {};
+        } catch {
+          return {};
+        }
+      })(),
       id: m.id,
       seq: m.seq,
       role: m.sender_role,

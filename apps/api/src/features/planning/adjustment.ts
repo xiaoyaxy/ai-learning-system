@@ -29,6 +29,7 @@ const line = z.string().min(1).max(1000),
         .min(1),
       time_setting: z.null(),
       time_constraint_text: z.string(),
+      review_ids: z.array(z.string()).optional(),
     })
     .strict();
 const AdjustmentSchema = z
@@ -124,10 +125,22 @@ export class AdjustmentService {
           public_context: step.input,
         });
         const d = AdjustmentSchema.parse(r.content);
-        const oldPromises=JSON.stringify(old.tasks.map((t:any)=>[t.goal,t.skill_id,t.output]).sort());
-        const newPromises=JSON.stringify(d.plan.tasks.map(t=>[t.goal,t.skill_id,t.output]).sort());
-        if(oldPromises!==newPromises&&!d.changed_constraints.some(c=>c.kind==='goal'))throw new ApiError('MODEL_INVALID_RESULT',422);
-        if(d.plan.time_constraint_text!==w.project.time_constraint_text&&!d.changed_constraints.some(c=>c.kind==='time'))throw new ApiError('MODEL_INVALID_RESULT',422);
+        const oldPromises = JSON.stringify(
+          old.tasks.map((t: any) => [t.goal, t.skill_id, t.output]).sort(),
+        );
+        const newPromises = JSON.stringify(
+          d.plan.tasks.map((t) => [t.goal, t.skill_id, t.output]).sort(),
+        );
+        if (
+          oldPromises !== newPromises &&
+          !d.changed_constraints.some((c) => c.kind === "goal")
+        )
+          throw new ApiError("MODEL_INVALID_RESULT", 422);
+        if (
+          d.plan.time_constraint_text !== w.project.time_constraint_text &&
+          !d.changed_constraints.some((c) => c.kind === "time")
+        )
+          throw new ApiError("MODEL_INVALID_RESULT", 422);
         if (
           d.plan.tasks.some((t) =>
             t.material_ids.some((id) => !w.sources.some((s) => s.id === id)),

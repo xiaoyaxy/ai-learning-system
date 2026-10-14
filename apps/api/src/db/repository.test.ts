@@ -358,3 +358,71 @@ describe("project facts and receipts", () => {
     ).rejects.toThrow("IMMUTABLE_RECORD");
   });
 });
+
+it("reads revision and messages from one consistent snapshot during a concurrent write", async () => {
+  const { repo, owner, p1, ctx, command } = await fixture();
+  await repo.acceptCommand(ctx, command);
+  let injected = false;
+  const wrapped = new Proxy(db, {
+    get(target, key) {
+      if (key === "prepare")
+        return (sql: string) => {
+          const stmt = target.prepare(sql);
+          if (sql === "SELECT * FROM projects WHERE id=?")
+            return new Proxy(stmt, {
+              get(s, k) {
+                if (k === "bind")
+                  return (...args: any[]) => {
+                    const bound = s.bind(...args);
+                    return new Proxy(bound, {
+                      get(b, method) {
+                        if (method === "first")
+                          return async () => {
+                            const old = await b.first();
+                            if (!injected) {
+                              injected = true;
+                              await repo.commitStep(
+                                {
+                                  ...ctx,
+                                  operation_id: command.client_operation_id,
+                                  step_key: "during-read",
+                                  base_revision: 1,
+                                  epoch: 0,
+                                  actor: "planner",
+                                },
+                                {
+                                  entities: [
+                                    {
+                                      table: "messages",
+                                      row: {
+                                        id: crypto.randomUUID(),
+                                        sender_role: "planner",
+                                        body: "concurrent",
+                                      },
+                                    },
+                                  ],
+                                },
+                              );
+                            }
+                            return old;
+                          };
+                        const value = (b as any)[method];
+                        return typeof value === "function"
+                          ? value.bind(b)
+                          : value;
+                      },
+                    });
+                  };
+                const value = (s as any)[k];
+                return typeof value === "function" ? value.bind(s) : value;
+              },
+            });
+          return stmt;
+        };
+      const value = (target as any)[key];
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  const w = await new ProjectRepository(wrapped).readWorkspace(p1.id);
+  expect(w.project.revision).toBe(w.messages.length);
+});

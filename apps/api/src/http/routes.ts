@@ -54,6 +54,15 @@ export function createApp(deps: {
       })),
     );
   });
+  app.get("/api/v1/session", (c) =>
+    c.json({
+      mode:
+        c.env.DEPLOYMENT_ENV === "local" && c.env.DEMO_MODE === "true"
+          ? "demo"
+          : "configured",
+      environment: c.env.DEPLOYMENT_ENV,
+    }),
+  );
   app.post("/api/v1/projects", async (c) => {
     const input = CreateProjectSchema.parse(await readJson(c.req.raw));
     const p = await deps.repo.create(c.get("principal").owner_id, input);

@@ -281,7 +281,12 @@ export class ProjectSupervisor extends Agent<Env, RuntimeState> {
       try {
         const w = await repo.readWorkspace(ctx.project_id),
           run = w.runs.find((r) => r.id === payload.run_id);
-        if (run) await new TaskRunner(repo).fail(ctx, run, error);
+        if (
+          run &&
+          run.epoch === payload.epoch &&
+          ["queued", "running"].includes(run.status)
+        )
+          await new TaskRunner(repo).fail(ctx, run, error);
       } catch {}
     } finally {
       if (recoveryId) {
