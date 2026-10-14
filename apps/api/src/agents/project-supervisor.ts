@@ -1,3 +1,5 @@
+import { parseMention } from "@learning/contracts";
+import { runLearningCommand } from "../features/workflow";
 import { Agent } from "agents";
 import type { CommandEnvelope, Role } from "@learning/contracts";
 import { z } from "zod";
@@ -68,6 +70,13 @@ export class ProjectSupervisor extends Agent<Env, RuntimeState> {
       const accepted = await repo.acceptCommand(ctx, input);
       await this.reconcile();
       return accepted;
+    }
+    if (input.command.type === "send_message") {
+      const mention = parseMention(
+        input.command.text,
+        input.command.target_role,
+      );
+      if (!mention.ok) throw new ApiError("AMBIGUOUS_MENTION", 422);
     }
     const pending = p.pending_input_json
       ? JSON.parse(p.pending_input_json)
@@ -364,6 +373,21 @@ export class ProjectSupervisor extends Agent<Env, RuntimeState> {
         }),
       });
     }
+    if (cmd.type === "send_message") {
+      const mention = parseMention(cmd.text, cmd.target_role);
+      if (!mention.ok) throw new ApiError("AMBIGUOUS_MENTION", 422);
+      if (mention.role) cmd.target_role = mention.role;
+    }
+    if (
+      await runLearningCommand(
+        repo,
+        ctx,
+        run,
+        (task) => this.executeTask(task),
+        cmd,
+      )
+    )
+      return;
     if (cmd.type !== "send_message") throw new ApiError("NOT_IMPLEMENTED", 501);
     let role: Role = cmd.target_role ?? "supervisor";
     const runner = new TaskRunner(repo);

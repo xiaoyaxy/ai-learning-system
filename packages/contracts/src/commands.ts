@@ -99,3 +99,36 @@ export interface AcceptedCommand {
   revision: number;
   replayed: boolean;
 }
+
+export interface MentionResult {
+  ok: boolean;
+  role?: Role;
+  text: string;
+  body: string;
+  code?: "AMBIGUOUS_MENTION";
+}
+export function parseMention(text: string, selectedRole?: Role): MentionResult {
+  const aliases: Record<string, Role> = {
+    学务总管: "supervisor",
+    总管: "supervisor",
+    规划师: "planner",
+    知识管家: "curator",
+    陪练官: "coach",
+    supervisor: "supervisor",
+    planner: "planner",
+    curator: "curator",
+    coach: "coach",
+  };
+  const pattern =
+    /^[@＠](学务总管|总管|规划师|知识管家|陪练官|supervisor|planner|curator|coach)(?:\s+|$)/i;
+  const trimmed = text.trimStart(),
+    match = pattern.exec(trimmed),
+    role = match ? aliases[match[1].toLowerCase()] : undefined,
+    body = match ? trimmed.slice(match[0].length) : text;
+  if (
+    (role && selectedRole && role !== selectedRole) ||
+    pattern.test(body.trimStart())
+  )
+    return { ok: false, text, body, code: "AMBIGUOUS_MENTION" };
+  return { ok: true, role: role ?? selectedRole, text, body };
+}

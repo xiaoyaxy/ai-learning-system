@@ -27,3 +27,20 @@ describe("untrusted commands", () => {
     ).toBe(true);
   });
 });
+
+import { parseMention } from "./commands";
+describe("explicit mentions", () => {
+  it("routes a leading role mention without changing the saved text", () => {
+    expect(parseMention("@规划师 帮我调整").role).toBe("planner");
+    expect(parseMention("@规划师 帮我调整").text).toBe("@规划师 帮我调整");
+  });
+  it("rejects selector and mention conflicts", () => {
+    expect(parseMention("@规划师 帮我调整", "coach")).toMatchObject({
+      ok: false,
+      code: "AMBIGUOUS_MENTION",
+    });
+  });
+  it("rejects multiple leading role mentions", () => {
+    expect(parseMention("@规划师 @陪练官 帮我看")).toMatchObject({ ok: false });
+  });
+});
