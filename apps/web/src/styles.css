@@ -107,6 +107,7 @@ small {
 .app-shell {
   display: grid;
   grid-template-columns: 230px minmax(0, 1fr) 280px;
+  grid-template-rows: minmax(0, 1fr);
   height: 100dvh;
   min-height: 500px;
 }
@@ -114,6 +115,8 @@ small {
   background: var(--soft);
   border-right: 1px solid var(--border);
   padding: 26px 16px;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -164,6 +167,9 @@ small {
 .project-list {
   display: grid;
   gap: 8px;
+  flex: 1;
+  min-height: 0;
+  align-content: start;
   overflow: auto;
 }
 .project {

@@ -4,7 +4,7 @@
 
 ## 自动验证
 
-已通过 `npm run typecheck`、`npm test`（98 项：API 88、Web 5、契约 5）、`npm run build`（含 Wrangler dry-run）、`npm run test:e2e`（9 个浏览器流程，1.9 分钟）。构建检查未上传 Cloudflare。浏览器截图生成到本地 `test-results/workspace-*.png`，不提交个人学习数据。
+已通过 `npm run typecheck`、`npm test`（103 项：API 93、Web 5、契约 5）、`npm run build`（含 Wrangler dry-run）、`npm run test:e2e`（9 个浏览器流程，2.0 分钟）。构建检查未上传 Cloudflare。浏览器截图生成到本地 `test-results/workspace-*.png`，不提交个人学习数据。
 
 | 编号 | 已实现与自动验证入口 |
 | --- | --- |
@@ -38,3 +38,9 @@
 | 推送提醒 | 未配置；复习记录保留在应用中 |
 
 这些限制不阻止 `npm run demo` 本地演示。云端／真实模型验收完成前，不标记“已上线”或“真实质量通过”。
+
+## 最终审阅
+
+完成一次独立、只读的整分支审阅。4 个重要问题均先复现失败再修复：控制命令原子提交、诊断／周复盘按收据恢复、笔记更新重试、项目列表独立滚动。修复后全量 103 项自动测试及 9 项浏览器流程通过。
+
+保留两项云端交互小问题：登录过期提示目前与断网相同；导出尚未额外拒绝登录页 HTML200。本地 demo 无登录重定向，不受这两个场景影响。详情与全部实施决定见 implementation-notes.md。

@@ -296,3 +296,35 @@ it("archives exactly three literal points, schedules from the learner message da
     ),
   );
 });
+
+it("replays a saved note update before checking its superseded base version", async () => {
+  const { repo, ctx, p, service } = await fixture("第二版原话");
+  await repo.commitStep(
+    { ...ctx, step_key: "old-note" },
+    {
+      entities: [
+        {
+          table: "artifacts",
+          row: {
+            id: "old-note",
+            kind: "note",
+            version: 1,
+            content: "第一版",
+            evidence_message_ids: "[]",
+          },
+        },
+      ],
+    },
+  );
+  const base = {
+    id: "old-note",
+    project_id: p.id,
+    kind: "note" as const,
+    version: 1,
+  };
+  const a = await service.saveNote(ctx, "第二版原话", base);
+  await expect(service.saveNote(ctx, "第二版原话", base)).resolves.toEqual(a);
+  expect(
+    (await repo.readWorkspace(p.id)).artifacts.filter((a) => a.kind === "note"),
+  ).toHaveLength(2);
+});

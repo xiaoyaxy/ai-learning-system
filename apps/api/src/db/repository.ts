@@ -307,6 +307,49 @@ export class ProjectRepository {
         .first();
       if (active) throw new RepositoryError("RUN_BUSY");
     }
+    const cmd = input.command,
+      isRunControl = control && cmd.type !== "supplement_requirements",
+      targetId = isRunControl && "run_id" in cmd ? cmd.run_id : p.active_run_id,
+      target =
+        control && targetId
+          ? await this.db
+              .prepare(
+                "SELECT id,status,retry_count FROM agent_runs WHERE project_id=? AND id=?",
+              )
+              .bind(p.id, targetId)
+              .first<{ id: string; status: string; retry_count: number }>()
+          : null;
+    if (isRunControl && (!target || target.id !== p.active_run_id))
+      throw new RepositoryError("FORBIDDEN");
+    if (
+      (cmd.type === "resume_run" && target?.status !== "paused") ||
+      (cmd.type === "retry_run" && target?.status !== "failed")
+    )
+      throw new RepositoryError("INVALID_STAGE");
+    if (cmd.type === "retry_run" && target!.retry_count >= 2)
+      throw new RepositoryError("BUDGET_EXCEEDED");
+    const epoch = control ? p.run_epoch + 1 : p.run_epoch,
+      targetStatus =
+        cmd.type === "pause_run"
+          ? "paused"
+          : cmd.type === "cancel_run" || cmd.type === "supplement_requirements"
+            ? "cancelled"
+            : "queued",
+      controlWrites: D1PreparedStatement[] = [];
+    if (control && target)
+      controlWrites.push(
+        this.db
+          .prepare(
+            "UPDATE agent_runs SET status=?,epoch=?,retry_count=?,error_code=NULL WHERE project_id=? AND id=?",
+          )
+          .bind(
+            targetStatus,
+            epoch,
+            target.retry_count + (cmd.type === "retry_run" ? 1 : 0),
+            p.id,
+            target.id,
+          ),
+      );
     const runId = crypto.randomUUID(),
       messageId = crypto.randomUUID(),
       response = { run_id: runId, revision: p.revision + 1, replayed: false };
@@ -324,8 +367,8 @@ export class ProjectRepository {
             p.id,
             runId,
             input.client_operation_id,
-            p.run_epoch,
-            "queued",
+            epoch,
+            isRunControl ? "succeeded" : "queued",
             JSON.stringify(input.command),
           ),
         this.db
@@ -343,11 +386,45 @@ export class ProjectRepository {
             "INSERT INTO messages(project_id,id,seq,sender_role,body,run_id) SELECT ?,?,COALESCE(MAX(seq),0)+1,'user',?,? FROM messages WHERE project_id=?",
           )
           .bind(p.id, messageId, body, runId, p.id),
+        ...controlWrites,
+        ...(control
+          ? [
+              this.db
+                .prepare(
+                  "INSERT INTO domain_events(project_id,seq,type,payload_json,run_id,role) SELECT ?,COALESCE(MAX(seq),0)+1,?,?,?,'supervisor' FROM domain_events WHERE project_id=?",
+                )
+                .bind(
+                  p.id,
+                  cmd.type === "supplement_requirements"
+                    ? "handoff_committed"
+                    : "role_status_changed",
+                  JSON.stringify(
+                    cmd.type === "supplement_requirements"
+                      ? {
+                          from: "supervisor",
+                          to: "planner",
+                          text: "已保存补充要求并停止旧任务，重新协调后续安排",
+                        }
+                      : {
+                          status: targetStatus,
+                          text:
+                            cmd.type === "pause_run"
+                              ? "协作已暂停，已提交内容保留"
+                              : cmd.type === "cancel_run"
+                                ? "协作已取消"
+                                : "从检查点继续",
+                        },
+                  ),
+                  isRunControl ? targetId : runId,
+                  p.id,
+                ),
+            ]
+          : []),
         this.db
           .prepare(
-            "UPDATE projects SET revision=revision+1,active_run_id=? WHERE id=?",
+            `UPDATE projects SET revision=revision+1,active_run_id=?,run_epoch=?${cmd.type === "supplement_requirements" ? ",pending_input_json=NULL" : ""} WHERE id=?`,
           )
-          .bind(runId, p.id),
+          .bind(isRunControl ? targetId : runId, epoch, p.id),
       ]);
     } catch (e) {
       const duplicate = await replay();

@@ -112,6 +112,19 @@ test("项目群聊：两个项目隔离、独立答题、政策确认和成绩�
   ).toBeVisible();
 });
 test("项目群聊：窄屏布局、对话框焦点与 Escape", async ({ page }) => {
+  const projects = await (await page.request.get("/api/v1/projects")).json();
+  await page.route("**/api/v1/projects", (route) =>
+    route.fulfill({
+      json: [
+        ...projects,
+        ...Array.from({ length: 30 }, (_, i) => ({
+          ...projects[0],
+          id: "layout-" + i,
+          name: "布局项目 " + i,
+        })),
+      ],
+    }),
+  );
   await page.goto("/");
   for (const width of [320, 375, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
@@ -127,6 +140,12 @@ test("项目群聊：窄屏布局、对话框焦点与 Escape", async ({ page })
       fullPage: true,
     });
   }
+  await expect
+    .poll(async () => {
+      const box = await page.locator(".composer").boundingBox();
+      return !!box && box.y + box.height <= 900;
+    })
+    .toBe(true);
   await page.setViewportSize({ width: 375, height: 900 });
   await page.getByRole("button", { name: "新建学习群", exact: true }).click();
   await expect(page.getByLabel("学习群名称")).toBeFocused();

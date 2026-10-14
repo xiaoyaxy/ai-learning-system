@@ -426,3 +426,76 @@ it("reads revision and messages from one consistent snapshot during a concurrent
   const w = await new ProjectRepository(wrapped).readWorkspace(p1.id);
   expect(w.project.revision).toBe(w.messages.length);
 });
+
+it("atomically accepts pause/resume/cancel and never leaves a queued control run", async () => {
+  const { repo, ctx, command, p1 } = await fixture();
+  const target = await repo.acceptCommand(ctx, command);
+  let w = await repo.readWorkspace(p1.id);
+  const pause = {
+    client_operation_id: crypto.randomUUID(),
+    expected_revision: w.project.revision,
+    command: { type: "pause_run" as const, run_id: target.run_id },
+  };
+  const accepted = await repo.acceptCommand(ctx, pause);
+  w = await repo.readWorkspace(p1.id);
+  expect(w.runs.find((r) => r.id === target.run_id)).toMatchObject({
+    status: "paused",
+    epoch: w.project.run_epoch,
+  });
+  expect(w.runs.find((r) => r.id === accepted.run_id)?.status).toBe(
+    "succeeded",
+  );
+  expect(w.project.active_run_id).toBe(target.run_id);
+  const epoch = w.project.run_epoch;
+  await repo.acceptCommand(ctx, pause);
+  expect((await repo.readWorkspace(p1.id)).project.run_epoch).toBe(epoch);
+  await repo.acceptCommand(ctx, {
+    client_operation_id: crypto.randomUUID(),
+    expected_revision: w.project.revision,
+    command: { type: "resume_run", run_id: target.run_id },
+  });
+  w = await repo.readWorkspace(p1.id);
+  expect(w.runs.find((r) => r.id === target.run_id)).toMatchObject({
+    status: "queued",
+    epoch: w.project.run_epoch,
+  });
+  await repo.acceptCommand(ctx, {
+    client_operation_id: crypto.randomUUID(),
+    expected_revision: w.project.revision,
+    command: { type: "cancel_run", run_id: target.run_id },
+  });
+  w = await repo.readWorkspace(p1.id);
+  expect(w.runs.find((r) => r.id === target.run_id)?.status).toBe("cancelled");
+  expect(
+    w.runs.filter((r) => ["queued", "running"].includes(r.status)),
+  ).toHaveLength(0);
+  await expect(
+    repo.acceptCommand(ctx, {
+      ...command,
+      client_operation_id: crypto.randomUUID(),
+      expected_revision: w.project.revision,
+    }),
+  ).resolves.toHaveProperty("run_id");
+});
+it("atomically stops the old generation and queues supplemental requirements", async () => {
+  const { repo, ctx, command, p1 } = await fixture();
+  const target = await repo.acceptCommand(ctx, command);
+  const before = await repo.readWorkspace(p1.id);
+  const c = {
+    client_operation_id: crypto.randomUUID(),
+    expected_revision: before.project.revision,
+    command: { type: "supplement_requirements" as const, text: "先学工具边界" },
+  };
+  const a = await repo.acceptCommand(ctx, c);
+  const w = await repo.readWorkspace(p1.id);
+  expect(w.runs.find((r) => r.id === target.run_id)?.status).toBe("cancelled");
+  expect(w.runs.find((r) => r.id === a.run_id)).toMatchObject({
+    status: "queued",
+    epoch: before.project.run_epoch + 1,
+  });
+  expect(w.project.run_epoch).toBe(before.project.run_epoch + 1);
+  await repo.acceptCommand(ctx, c);
+  expect((await repo.readWorkspace(p1.id)).project.run_epoch).toBe(
+    w.project.run_epoch,
+  );
+});

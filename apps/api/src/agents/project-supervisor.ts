@@ -104,8 +104,7 @@ export class ProjectSupervisor extends Agent<Env, RuntimeState> {
       )
         throw new ApiError("INVALID_STAGE", 409);
     }
-    const accepted = await repo.acceptCommand(ctx, input),
-      runner = new TaskRunner(repo);
+    const accepted = await repo.acceptCommand(ctx, input);
     const cmd = input.command;
     if (
       ["pause_run", "cancel_run", "resume_run", "retry_run"].includes(
@@ -121,8 +120,6 @@ export class ProjectSupervisor extends Agent<Env, RuntimeState> {
             : cmd.type === "resume_run"
               ? "resume"
               : "retry";
-      await runner.control(ctx, cmd.run_id, action);
-      await this.finishControl(accepted.run_id);
       if (action === "pause" || action === "cancel") {
         for (const Cls of [PlannerAgent, CuratorAgent, CoachAgent])
           this.dynamicAgents.abort(Cls, Cls.name, new Error("paused"));
@@ -138,41 +135,6 @@ export class ProjectSupervisor extends Agent<Env, RuntimeState> {
       return accepted;
     }
     if (cmd.type === "supplement_requirements") {
-      if (p.active_run_id) await runner.control(ctx, p.active_run_id, "cancel");
-      const latest = await repo.getProject(ctx.owner_id, ctx.project_id);
-      await repo.commitStep(
-        {
-          ...ctx,
-          operation_id: input.client_operation_id,
-          step_key: "supplement_generation",
-          base_revision: latest.revision,
-          epoch: latest.run_epoch,
-          actor: "runtime",
-        },
-        {
-          project_changes: {
-            active_run_id: accepted.run_id,
-            pending_input_json: null,
-          },
-          run_changes: {
-            run_id: accepted.run_id,
-            status: "queued",
-            epoch: latest.run_epoch,
-          },
-          events: [
-            {
-              type: "handoff_committed",
-              role: "supervisor",
-              run_id: accepted.run_id,
-              payload: {
-                from: "supervisor",
-                to: "planner",
-                text: "已保存补充要求并停止旧任务，重新协调后续安排",
-              },
-            },
-          ],
-        },
-      );
       for (const Cls of [PlannerAgent, CuratorAgent, CoachAgent])
         this.dynamicAgents.abort(
           Cls,
@@ -194,24 +156,6 @@ export class ProjectSupervisor extends Agent<Env, RuntimeState> {
       { idempotent: true },
     );
     return accepted;
-  }
-  private async finishControl(runId: string) {
-    const repo = new ProjectRepository(this.env.DB),
-      ctx = this.context(),
-      w = await repo.readWorkspace(ctx.project_id),
-      run = w.runs.find((r) => r.id === runId);
-    if (!run) return;
-    await repo.commitStep(
-      {
-        ...ctx,
-        operation_id: run.operation_id,
-        step_key: "control_complete",
-        base_revision: w.project.revision,
-        epoch: w.project.run_epoch,
-        actor: "runtime",
-      },
-      { run_changes: { run_id: runId, status: "succeeded" } },
-    );
   }
   async onStart() {
     if (this.state.project_id) await this.reconcile();

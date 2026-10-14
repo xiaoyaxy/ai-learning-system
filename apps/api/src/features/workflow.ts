@@ -40,6 +40,41 @@ export async function runLearningCommand(
     pending = w.project.pending_input_json
       ? JSON.parse(w.project.pending_input_json)
       : null;
+  // Persist interpretation before a service changes phase or pending input.
+  let route = {
+    phase: w.project.phase as string,
+    pending_kind: pending?.kind as string | null,
+  };
+  if (command.type === "send_message") {
+    let receipt = await repo.readReceipt(
+      ctx.project_id,
+      run.operation_id,
+      "workflow_route",
+    );
+    if (!receipt)
+      receipt = await repo.commitStep(
+        {
+          ...ctx,
+          operation_id: run.operation_id,
+          step_key: "workflow_route",
+          base_revision: w.project.revision,
+          epoch: run.epoch,
+          actor: "runtime",
+        },
+        {
+          result: {
+            phase: route.phase,
+            pending_kind: route.pending_kind ?? null,
+          },
+        },
+      );
+    route = {
+      phase: String(receipt.result.phase),
+      pending_kind: receipt.result.pending_kind
+        ? String(receipt.result.pending_kind)
+        : null,
+    };
+  }
   if (command.type === "reassess_answer") {
     const a = w.attempts.find((a) => a.id === command.attempt_id);
     if (!a) throw new ApiError("FORBIDDEN", 403);
@@ -105,7 +140,7 @@ export async function runLearningCommand(
   if (
     command.type === "send_message" &&
     command.mode === "answer" &&
-    pending?.kind === "weekly_review" &&
+    route.pending_kind === "weekly_review" &&
     (!command.target_role || command.target_role === "curator")
   ) {
     await archive.answerWeekly(curatorCtx, command.text);
@@ -195,7 +230,7 @@ export async function runLearningCommand(
   }
   if (
     command.type === "send_message" &&
-    w.project.phase === "scoping" &&
+    route.phase === "scoping" &&
     (!command.target_role ||
       ["supervisor", "planner"].includes(command.target_role))
   ) {
@@ -206,7 +241,7 @@ export async function runLearningCommand(
   if (
     command.type === "submit_diagnosis" ||
     (command.type === "send_message" &&
-      w.project.phase === "diagnosis" &&
+      route.phase === "diagnosis" &&
       !command.target_role)
   ) {
     if (!message) throw new ApiError("INVALID_STAGE", 409);
@@ -216,7 +251,7 @@ export async function runLearningCommand(
   }
   if (
     command.type === "send_message" &&
-    w.project.phase === "preparing" &&
+    route.phase === "preparing" &&
     environment
   ) {
     await prepareProject(repo, ctx, run, execute, environment);

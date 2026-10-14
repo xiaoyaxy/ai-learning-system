@@ -501,6 +501,18 @@ export class ArchiveService {
           m.body === text,
       ),
       latest = w.artifacts.filter((a) => a.kind === "note").at(-1);
+    const prior = await this.repo.readReceipt(
+      ctx.project_id,
+      ctx.operation_id,
+      "note_save",
+    );
+    if (prior)
+      return {
+        project_id: ctx.project_id,
+        id: String(prior.result.id),
+        kind: "note",
+        version: Number(prior.result.version),
+      };
     if (!m) throw new ApiError("FORBIDDEN", 403);
     if (
       base &&
@@ -624,10 +636,20 @@ export class ArchiveService {
       ctx.operation_id,
       "weekly_answer",
     );
-    if (prior)
-      return prior.result.pending
-        ? JSON.parse(String(prior.result.pending))
-        : null;
+    if (prior) {
+      if (prior.result.pending) return JSON.parse(String(prior.result.pending));
+      const w = await this.workspace(ctx),
+        message = w.messages.find(
+          (m) => m.run_id === ctx.run_id && m.sender_role === "user",
+        ),
+        attempt = w.attempts.find((a) => a.answer_message_id === message?.id),
+        question = w.questions.find((q) => q.id === attempt?.question_id),
+        sessionId = prior.result.session_id ?? question?.session_id;
+      if (!sessionId) throw new ApiError("INVALID_STAGE", 409);
+      await this.createWeeklyReport(ctx, String(sessionId));
+      await this.createIndex(ctx);
+      return null;
+    }
     const w = await this.workspace(ctx),
       pending = w.project.pending_input_json
         ? JSON.parse(w.project.pending_input_json)
@@ -689,7 +711,10 @@ export class ArchiveService {
           },
         },
       ],
-      result: { pending: after ? JSON.stringify(after) : null },
+      result: {
+        pending: after ? JSON.stringify(after) : null,
+        session_id: String(s.id),
+      },
     });
     if (!after) {
       await this.createWeeklyReport(ctx, String(s.id));
