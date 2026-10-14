@@ -1,4 +1,5 @@
 import { DemoLogin } from "./features/auth/DemoLogin";
+import { HandoffFeed } from "./features/chat/HandoffFeed";
 import { CurrentPlan } from "./features/planning/CurrentPlan";
 import { SubmissionCard } from "./features/archive/SubmissionCard";
 import { artifactNames } from "./lib/labels";
@@ -400,21 +401,7 @@ function Workspace({ projectId }: { projectId: string }) {
               </div>
             </article>
           ))}
-          {events
-            .filter(
-              (e) =>
-                e.type === "handoff_committed" || e.type === "task_assigned",
-            )
-            .slice(-6)
-            .map((e) => (
-              <div className="handoff" key={e.seq}>
-                <strong>
-                  {e.payload.from ? roles[e.payload.from].name : "学务总管"} →{" "}
-                  {e.payload.to ? roles[e.payload.to].name : "协作"}
-                </strong>
-                <span>{e.payload.text}</span>
-              </div>
-            ))}
+          <HandoffFeed events={events} runId={run?.id ?? null} roles={roles} />
           {w.policy?.status === "draft" && (
             <div className="card policy">
               <span className="eyebrow">
