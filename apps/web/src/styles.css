@@ -724,6 +724,7 @@ details summary {
     border-right: 0;
     border-bottom: 1px solid var(--border);
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     gap: 12px;
   }
@@ -745,7 +746,7 @@ details summary {
   .sidebar > .project-introduction {
     flex-shrink: 0;
     padding: 4px 0;
-    margin: 0;
+    margin: 0 0 0 auto;
   }
   .sidebar-heading,
   .project-list,
@@ -757,13 +758,14 @@ details summary {
   .mobile-projects {
     display: block;
     min-width: 0;
-    flex: 1;
+    flex: 1 1 calc(100% - 150px);
   }
   .mobile-projects label {
     display: flex;
     gap: 6px;
     align-items: center;
     font-size: 12px;
+    white-space: nowrap;
   }
   .mobile-projects select {
     min-width: 0;
