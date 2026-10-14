@@ -20,6 +20,7 @@ export function publicError(error: unknown): {
       : "INTERNAL_ERROR";
   const statuses: Record<string, number> = {
     UNAUTHENTICATED: 401,
+    INVALID_REQUEST: 422,
     FORBIDDEN: 403,
     REVISION_CONFLICT: 409,
     IDEMPOTENCY_CONFLICT: 409,
@@ -37,6 +38,7 @@ export function publicError(error: unknown): {
     error instanceof ApiError ? error.status : (statuses[code] ?? 500);
   const message: Record<string, string> = {
     UNAUTHENTICATED: "需要有效的本人登录",
+    INVALID_REQUEST: "输入格式不正确，请检查确认名称",
     FORBIDDEN: "无权执行此操作",
     REVISION_CONFLICT: "状态已更新，请刷新后重试",
     RUN_BUSY: "当前协作正在执行，请稍候或暂停",

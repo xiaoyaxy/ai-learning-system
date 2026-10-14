@@ -1,3 +1,4 @@
+import deletionMigration from "../db/migrations/0003_project_deletions.sql?raw";
 import { runInDurableObject } from "cloudflare:test";
 import type { ProjectSupervisor } from "../agents/project-supervisor";
 import { beforeAll, describe, it, expect } from "vitest";
@@ -11,6 +12,7 @@ import type { RoleResult } from "./types";
 const db = (env as unknown as { DB: D1Database }).DB;
 beforeAll(async () => {
   await db.exec(migration);
+  await db.exec(deletionMigration);
 });
 async function fixture() {
   const repo = new ProjectRepository(db),

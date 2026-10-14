@@ -40,6 +40,8 @@ export interface WorkStep {
   input: Record<string, unknown>;
 }
 export interface RuntimeState {
+  purge_pending?: boolean;
+  purge_name?: string;
   owner_id: string | null;
   project_id: string | null;
   run_id: string | null;

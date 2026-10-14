@@ -209,6 +209,7 @@ it("keeps committed artifacts unchanged when a D1 business write fails", async (
       await import("../db/migrations/0001_initial.sql?raw");
   const db = (env as unknown as { DB: D1Database }).DB;
   await db.exec(migration);
+  await db.exec((await import("../db/migrations/0003_project_deletions.sql?raw")).default);
   const repo = new ProjectRepository(db),
     owner = crypto.randomUUID(),
     p = await repo.create(owner, {

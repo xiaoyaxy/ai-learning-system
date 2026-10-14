@@ -303,8 +303,8 @@ export class ResourceService {
                 sender_role: "curator",
                 body:
                   coverage === "complete"
-                    ? "三层资料入口和知识地图已整理，待确认标记保留。"
-                    : "资料包尚不完整，已保留找到的入口和待确认项。",
+                    ? `已收集 ${sources.length} 份材料，整理 ${concepts.length} 个知识点，覆盖三层资料入口。检索摘要与原文链接已保存，待确认标记保留。`
+                    : `已收集 ${sources.length} 份材料，整理 ${concepts.length} 个知识点。资料包尚不完整，已保留找到的入口和待确认项。`,
                 run_id: ctx.run_id,
               },
             },

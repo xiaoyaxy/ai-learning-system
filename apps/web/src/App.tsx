@@ -1,3 +1,19 @@
+import { DeleteProjectDialog } from "./features/projects/DeleteProjectDialog";
+import type { ProjectSummary } from "./lib/api";
+import {
+  ResourceOverview,
+  LearningContent,
+  LearningStages,
+  MaterialLinks,
+  displayTimezone,
+} from "./features/learning/LearningMaterials";
+import {
+  latestArtifact,
+  readArtifact,
+  currentTaskCard,
+  localDate,
+  type Lesson,
+} from "./features/learning/materials";
 import { DemoLogin } from "./features/auth/DemoLogin";
 import { HandoffFeed } from "./features/chat/HandoffFeed";
 import { CurrentPlan } from "./features/planning/CurrentPlan";
@@ -62,7 +78,34 @@ export function App() {
     [selected, setSelected] = useState(
       () => localStorage.getItem("learning:selected") ?? "",
     ),
-    [create, setCreate] = useState(false);
+    [create, setCreate] = useState(false),
+    [deleting, setDeleting] = useState<ProjectSummary | null>(null),
+    [trash, setTrash] = useState(false),
+    [trashError, setTrashError] = useState("");
+  const deleted = useQuery({
+    queryKey: ["deleted-projects"],
+    queryFn: api.listDeletedProjects,
+    enabled: trash,
+  });
+  async function removeProject(permanent: boolean, name?: string) {
+    if (!deleting) return;
+    await api.deleteProject(deleting.id, permanent, name);
+    const removed = deleting.id;
+    queryClient.removeQueries({ queryKey: ["workspace", removed] });
+    queryClient.removeQueries({ queryKey: ["events", removed] });
+    for (const key of Object.keys(localStorage))
+      if (key.includes(removed) && key.startsWith("learning:"))
+        localStorage.removeItem(key);
+    if (selected === removed) {
+      setSelected("");
+      localStorage.removeItem("learning:selected");
+    }
+    queryClient.setQueryData<ProjectSummary[]>(["projects"], (rows) =>
+      rows?.filter((p) => p.id !== removed),
+    );
+    setDeleting(null);
+    await Promise.all([projects.refetch(), deleted.refetch()]);
+  }
   useEffect(() => {
     if (projects.data?.length && !selected) setSelected(projects.data[0].id);
   }, [projects.data, selected]);
@@ -88,17 +131,25 @@ export function App() {
         </div>
         <nav aria-label="学习群" className="project-list">
           {projects.data?.map((p) => (
-            <button
-              key={p.id}
-              className={selected === p.id ? "project selected" : "project"}
-              onClick={() => select(p.id)}
-            >
-              <span className="project-icon">{p.name.slice(0, 1)}</span>
-              <span>
-                <strong>{p.name}</strong>
-                <small>{phases[p.phase] ?? p.phase}</small>
-              </span>
-            </button>
+            <div className="project-row" key={p.id}>
+              <button
+                className={selected === p.id ? "project selected" : "project"}
+                onClick={() => select(p.id)}
+              >
+                <span className="project-icon">{p.name.slice(0, 1)}</span>
+                <span>
+                  <strong>{p.name}</strong>
+                  <small>{phases[p.phase] ?? p.phase}</small>
+                </span>
+              </button>
+              <button
+                className="project-delete"
+                aria-label={`删除学习群 ${p.name}`}
+                onClick={() => setDeleting(p)}
+              >
+                ×
+              </button>
+            </div>
           ))}
         </nav>
         <div className="mobile-projects">
@@ -127,6 +178,9 @@ export function App() {
         </button>
         <button className="new-project" onClick={() => setCreate(true)}>
           ＋ 新建学习群
+        </button>
+        <button className="trash-button" onClick={() => setTrash(true)}>
+          已删除学习群
         </button>
         <div className="sidebar-note">
           <strong>一群 AI，一个学习项目</strong>
@@ -160,7 +214,14 @@ export function App() {
           正在读取学习群…
         </div>
       ) : selected ? (
-        <Workspace key={selected} projectId={selected} />
+        <Workspace
+          key={selected}
+          projectId={selected}
+          onDelete={() => {
+            const p = projects.data?.find((p) => p.id === selected);
+            if (p) setDeleting(p);
+          }}
+        />
       ) : (
         <div className="empty">
           <span className="eyebrow">LEARN · PRACTICE · REFLECT</span>
@@ -170,6 +231,50 @@ export function App() {
             创建第一个学习群
           </button>
         </div>
+      )}
+      {deleting && (
+        <DeleteProjectDialog
+          project={deleting}
+          onClose={() => setDeleting(null)}
+          onDelete={removeProject}
+        />
+      )}
+      {trash && !deleting && (
+        <Dialog title="已删除学习群" onClose={() => setTrash(false)}>
+          {trashError && <p role="alert">{trashError}</p>}
+          {deleted.isPending ? (
+            <p>读取中…</p>
+          ) : deleted.error ? (
+            <p role="alert">{deleted.error.message}</p>
+          ) : !deleted.data?.length ? (
+            <p>没有已删除的学习群。</p>
+          ) : (
+            deleted.data.map((p) => (
+              <section className="deleted-project" key={p.id}>
+                <strong>{p.name}</strong>
+                <div>
+                  <button
+                    onClick={() => {
+                      setTrashError("");
+                      void api
+                        .restoreProject(p.id)
+                        .then(async () => {
+                          await projects.refetch();
+                          await deleted.refetch();
+                          select(p.id);
+                          setTrash(false);
+                        })
+                        .catch((e) => setTrashError(e.message));
+                    }}
+                  >
+                    恢复学习群
+                  </button>
+                  <button onClick={() => setDeleting(p)}>彻底删除</button>
+                </div>
+              </section>
+            ))
+          )}
+        </Dialog>
       )}
       {create && (
         <CreateDialog
@@ -184,7 +289,13 @@ export function App() {
     </div>
   );
 }
-function Workspace({ projectId }: { projectId: string }) {
+function Workspace({
+  projectId,
+  onDelete,
+}: {
+  projectId: string;
+  onDelete: () => void;
+}) {
   const session = useQuery({
     queryKey: ["session"],
     queryFn: () => api.getSession(),
@@ -204,6 +315,8 @@ function Workspace({ projectId }: { projectId: string }) {
     [details, setDetails] = useState(false),
     [artifact, setArtifact] = useState<PublicArtifactDTO | null>(null),
     [archives, setArchives] = useState(false),
+    [lesson, setLesson] = useState<Lesson | null>(null),
+    [openToday, setOpenToday] = useState(false),
     [requirements, setRequirements] = useState(false),
     [editPolicy, setEditPolicy] = useState(false),
     lock = useRef(false),
@@ -238,6 +351,15 @@ function Workspace({ projectId }: { projectId: string }) {
       setBusy(false);
     }
   }
+  useEffect(() => {
+    if (openToday && w && !active && w.active_run?.status !== "failed") {
+      const card = currentTaskCard(w)?.lesson;
+      if (card && card.date === localDate(w.project.timezone)) {
+        setLesson(card);
+        setOpenToday(false);
+      }
+    }
+  }, [openToday, w, active]);
   if (!w)
     return (
       <div className="empty">
@@ -249,7 +371,14 @@ function Workspace({ projectId }: { projectId: string }) {
         )}
       </div>
     );
-  const context = <Context w={w} events={events} onArtifact={setArtifact} />;
+  const context = (
+    <Context
+      w={w}
+      events={events}
+      onArtifact={setArtifact}
+      onLesson={setLesson}
+    />
+  );
   const run = w.active_run;
   return (
     <>
@@ -260,11 +389,12 @@ function Workspace({ projectId }: { projectId: string }) {
             <h1>{w.project.name}</h1>
             <p>
               {w.project.time_constraint_text || "时间安排待明确"}{" "}
-              <span>·</span> {w.project.timezone}
+              <span>·</span> {displayTimezone(w.project.timezone)}
             </p>
           </div>
           <div className="header-actions">
             <button onClick={() => setDetails(true)}>群资料</button>
+            <button onClick={onDelete}>删除群</button>
             <button onClick={() => setArchives(true)}>项目档案</button>
             <button onClick={() => setRequirements(true)}>补充要求</button>
             {run && active && (
@@ -362,6 +492,8 @@ function Workspace({ projectId }: { projectId: string }) {
         )}
         <div className="conversation" aria-label="学习群消息">
           <p className="conversation-caption">每一次理解，都留下真实记录</p>
+          <LearningStages workspace={w} />
+          <ResourceOverview workspace={w} onCourse={setLesson} />
           <CurrentPlan workspace={w} />
           {w.messages.length === 0 && (
             <div className="welcome-card">
@@ -396,7 +528,11 @@ function Workspace({ projectId }: { projectId: string }) {
                   </time>
                 </div>
                 <div className="message-body">
-                  <MessageContent text={m.text} commandType={m.command_type} />
+                  <MessageContent
+                    text={m.text}
+                    commandType={m.command_type}
+                    workspace={w}
+                  />
                 </div>
               </div>
             </article>
@@ -514,10 +650,26 @@ function Workspace({ projectId }: { projectId: string }) {
         <footer className="chat-footer">
           <div className="quick-actions">
             <button
-              disabled={busy || active || !!w.pending_input}
-              onClick={() =>
-                void send({ type: "start_learning" }).catch(() => {})
+              disabled={
+                busy ||
+                active ||
+                w.phase !== "learning" ||
+                (!!w.pending_input && w.pending_input.kind !== "start_learning")
               }
+              onClick={() => {
+                const card = currentTaskCard(w)?.lesson;
+                if (
+                  card &&
+                  card.date === localDate(w.project.timezone) &&
+                  !w.pending_input
+                ) {
+                  setLesson(card);
+                  return;
+                }
+                void send({ type: "start_learning" })
+                  .then(() => setOpenToday(true))
+                  .catch(() => {});
+              }}
             >
               开始学习
             </button>
@@ -610,6 +762,11 @@ function Workspace({ projectId }: { projectId: string }) {
           onClose={() => setEditPolicy(false)}
         />
       )}
+      {lesson && (
+        <Dialog title="学习内容与资料" onClose={() => setLesson(null)}>
+          <LearningContent lesson={lesson} workspace={w} />
+        </Dialog>
+      )}
       {archives && (
         <Dialog title="项目档案" onClose={() => setArchives(false)}>
           <ArchivePanel
@@ -697,19 +854,19 @@ function Context({
   w,
   events,
   onArtifact,
+  onLesson,
 }: {
   w: WorkspaceDTO;
   events: { type: string; payload: { to?: Role } }[];
   onArtifact: (a: PublicArtifactDTO) => void;
+  onLesson: (lesson: Lesson) => void;
 }) {
   const current = events.filter((e) => e.type === "task_assigned").at(-1)
       ?.payload.to,
     active = ["queued", "running"].includes(w.active_run?.status ?? ""),
-    latest = w.artifacts.filter((a) => a.kind === "task_card").at(-1);
-  let task: any;
-  try {
-    task = JSON.parse(latest?.content ?? "null");
-  } catch {}
+    currentCard = currentTaskCard(w),
+    latest = currentCard?.artifact,
+    task = currentCard?.lesson;
   return (
     <>
       <h2>你的学习团队</h2>
@@ -738,7 +895,10 @@ function Context({
       {task && (
         <section>
           <h2>
-            今天的安排 <span>v{latest?.version}</span>
+            {task.date === localDate(w.project.timezone)
+              ? "今天的安排"
+              : "最近学习安排"}{" "}
+            <span>v{latest?.version}</span>
           </h2>
           <strong>{task.goal}</strong>
           {task.blocks?.map((b: any) => (
@@ -755,6 +915,8 @@ function Context({
               {b.activity}
             </p>
           ))}
+          <MaterialLinks ids={task.material_ids ?? []} workspace={w} />
+          <button onClick={() => onLesson(task)}>打开今日学习内容</button>
         </section>
       )}
       <section>
@@ -811,7 +973,7 @@ function CreateDialog({
               name,
               goal_text: goal,
               time_constraint_text: time,
-              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              timezone: "Asia/Shanghai",
             });
             try {
               await api.sendCommand(
@@ -878,9 +1040,11 @@ function CreateDialog({
 function MessageContent({
   text,
   commandType,
+  workspace,
 }: {
   text: string;
   commandType?: string;
+  workspace: WorkspaceDTO;
 }) {
   const actions: Record<string, string> = {
     start_learning: "开始今天的学习",
@@ -905,20 +1069,13 @@ function MessageContent({
       return (
         <div className="inline-task">
           <strong>今日学习安排</strong>
-          <p>{value.goal}</p>
-          {value.blocks.map((b: any, i: number) => (
-            <p key={i}>
-              <strong>
-                {{
-                  deep: "深入学习",
-                  supplement: "补充巩固",
-                  reflection: "回忆表达",
-                }[b.kind as "deep"] ?? "学习环节"}
-              </strong>{" "}
-              · {b.activity}
-            </p>
-          ))}
-          <p>你的产出：{value.output}</p>
+          <LearningContent
+            lesson={value}
+            workspace={workspace}
+            artifact={workspace.artifacts.find(
+              (a) => a.kind === "task_card" && a.content === text,
+            )}
+          />
         </div>
       );
   } catch {}

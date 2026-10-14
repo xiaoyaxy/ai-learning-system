@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import {
@@ -20,6 +21,12 @@ export interface CommandDispatcher {
     projectId: string,
     envelope: CommandEnvelope,
   ): Promise<AcceptedCommand>;
+  remove?(
+    principal: Principal,
+    projectId: string,
+    permanent: boolean,
+    confirmationName?: string,
+  ): Promise<void>;
   wake?(principal: Principal, projectId: string): Promise<void>;
 }
 export function createApp(deps: {
@@ -60,6 +67,55 @@ export function createApp(deps: {
         phase: p.phase,
       })),
     );
+  });
+  app.get("/api/v1/projects/deleted", async (c) =>
+    c.json(
+      (await deps.repo.listDeletedProjects(c.get("principal").owner_id)).map(
+        (p) => ({
+          id: p.id,
+          name: p.name,
+          goal_text: p.goal_text,
+          timezone: p.timezone,
+          phase: p.phase,
+        }),
+      ),
+    ),
+  );
+  app.delete("/api/v1/projects/:id", async (c) => {
+    const input = z
+      .object({
+        permanent: z.boolean(),
+        confirmation_name: z.string().optional(),
+      })
+      .strict()
+      .parse(await readJson(c.req.raw));
+    const principal = c.get("principal"),
+      id = c.req.param("id");
+    if (deps.dispatcher.remove)
+      await deps.dispatcher.remove(
+        principal,
+        id,
+        input.permanent,
+        input.confirmation_name,
+      );
+    else
+      await deps.repo.deleteProject(
+        principal.owner_id,
+        id,
+        input.permanent,
+        input.confirmation_name,
+      );
+    return c.json({
+      status: input.permanent ? "permanently_deleted" : "deleted",
+    });
+  });
+  app.post("/api/v1/projects/:id/restore", async (c) => {
+    await readJson(c.req.raw);
+    await deps.repo.restoreProject(
+      c.get("principal").owner_id,
+      c.req.param("id"),
+    );
+    return c.json({ status: "restored" });
   });
   app.get("/api/v1/session", (c) =>
     c.json({

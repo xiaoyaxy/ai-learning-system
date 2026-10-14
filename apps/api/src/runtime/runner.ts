@@ -190,6 +190,19 @@ export class TaskRunner {
         ["STALE_EPOCH", "REVISION_CONFLICT"].includes(String(error.code))
       )
         throw error;
+      console.warn("step_failed", {
+        step: step.key,
+        error_type: error instanceof Error ? error.name : "unknown",
+        code:
+          error instanceof Error && "code" in error ? String(error.code) : null,
+        stack:
+          error instanceof Error
+            ? error.stack
+                ?.split("\n")
+                .filter((l) => l.trim().startsWith("at "))
+                .slice(0, 3)
+            : [],
+      });
       await this.fail(ctx, run, error);
       throw error;
     }

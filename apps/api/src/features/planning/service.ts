@@ -220,7 +220,7 @@ export class PlanningService {
           );
         outcome = { kind: "definition", artifact: prepared.ref };
         const text =
-          "学习范围与第一版成果方向已整理。请用自己的话说说你现在的理解、已知词汇和困惑。";
+          "学习目标已明确。接下来由知识管家收集资料，再由规划师生成整体学习计划。你也可以随后补充自己的起点与困惑。";
         return {
           entities: [
             prepared.entity,
@@ -235,15 +235,10 @@ export class PlanningService {
             },
           ],
           project_changes: {
-            phase: "diagnosis",
-            pending_input_json: JSON.stringify({
-              kind: "diagnosis",
-              entity_id: prepared.ref.id,
-              version: prepared.ref.version,
-              expected_role: "planner",
-            }),
+            phase: "preparing",
+            pending_input_json: null,
           },
-          run_changes: { run_id: ctx.run_id, status: "waiting_user" },
+          run_changes: { run_id: ctx.run_id, status: "running" },
           events: [
             {
               type: "artifact_committed",
@@ -367,7 +362,18 @@ export class PlanningService {
           );
         ref = prepared.ref;
         return {
-          entities: [prepared.entity],
+          entities: [
+            prepared.entity,
+            {
+              table: "messages",
+              row: {
+                id: crypto.randomUUID(),
+                sender_role: "planner",
+                body: `整体学习计划已生成：共 ${value.tasks.length} 节课程。\n${value.tasks.map((t, i) => `${i + 1}. ${t.goal}；产出：${t.output}`).join("\n")}`,
+                run_id: ctx.run_id,
+              },
+            },
+          ],
           project_changes: { active_plan_id: ref.id, phase: "learning" },
           events: [
             {
@@ -444,6 +450,8 @@ export class PlanningService {
               card.blocks.find((b) => b.kind === k)!,
             ),
             date: localDate,
+            goal_version: w.project.goal_version,
+            plan_id: plan.id,
             time_setting: null,
             review_ids: reviews.map((r) => String(r.id)),
           },

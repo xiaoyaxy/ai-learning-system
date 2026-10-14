@@ -1,3 +1,4 @@
+import deletionMigration from "../../db/migrations/0003_project_deletions.sql?raw";
 import { beforeAll, it, expect } from "vitest";
 import { env } from "cloudflare:workers";
 import migration from "../../db/migrations/0001_initial.sql?raw";
@@ -6,6 +7,7 @@ import { PlanningService } from "./service";
 const db = (env as unknown as { DB: D1Database }).DB;
 beforeAll(async () => {
   await db.exec(migration);
+  await db.exec(deletionMigration);
 });
 async function setup(affected = false) {
   const repo = new ProjectRepository(db),

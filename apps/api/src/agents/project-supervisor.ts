@@ -50,6 +50,68 @@ export class ProjectSupervisor extends Agent<Env, RuntimeState> {
         project_id: projectId,
       });
   }
+  async removeProject(
+    principal: Principal,
+    projectId: string,
+    permanent: boolean,
+    confirmationName?: string,
+  ) {
+    if (
+      this.state.project_id &&
+      (this.state.project_id !== projectId ||
+        this.state.owner_id !== principal.owner_id)
+    )
+      throw new ApiError("FORBIDDEN", 403);
+    const repo = new ProjectRepository(this.env.DB);
+    if (permanent) {
+      if (!this.state.purge_pending) {
+        await repo.authorizeDeletion(
+          principal.owner_id,
+          projectId,
+          true,
+          confirmationName,
+        );
+        this.setState({
+          ...this.state,
+          owner_id: principal.owner_id,
+          project_id: projectId,
+          purge_pending: true,
+          purge_name: confirmationName,
+        });
+      }
+      // Durable backstop exists before any destructive D1 or facet operation.
+      await this.schedule(60, "finishPermanentDeletion", null, {
+        idempotent: true,
+      });
+      await this.finishPermanentDeletion();
+      return;
+    }
+    await repo.deleteProject(principal.owner_id, projectId, false);
+    for (const Cls of [PlannerAgent, CuratorAgent, CoachAgent])
+      this.dynamicAgents.abort(Cls, Cls.name, new Error("project deleted"));
+    for (const schedule of await this.listSchedules())
+      await this.cancelSchedule(schedule.id);
+  }
+  async finishPermanentDeletion() {
+    if (!this.state.purge_pending) return;
+    const ctx = this.context(),
+      repo = new ProjectRepository(this.env.DB);
+    if (!(await repo.isMissing(ctx.project_id)))
+      await repo.deleteProject(
+        ctx.owner_id,
+        ctx.project_id,
+        true,
+        this.state.purge_name,
+      );
+    for (const Cls of [PlannerAgent, CuratorAgent, CoachAgent])
+      this.dynamicAgents.abort(Cls, Cls.name, new Error("project deleted"));
+    for (const schedule of await this.listSchedules())
+      if (schedule.callback !== "finishPermanentDeletion")
+        await this.cancelSchedule(schedule.id);
+    for (const Cls of [PlannerAgent, CuratorAgent, CoachAgent])
+      await this.dynamicAgents.delete(Cls, Cls.name);
+    await this._cf_scheduleDestroy();
+  }
   private context() {
     if (!this.state.owner_id || !this.state.project_id)
       throw new ApiError("FORBIDDEN", 403);
@@ -159,13 +221,21 @@ export class ProjectSupervisor extends Agent<Env, RuntimeState> {
     return accepted;
   }
   async onStart() {
+    if (this.state.purge_pending) {
+      await this.schedule(0, "finishPermanentDeletion", null, {
+        idempotent: true,
+      });
+      return;
+    }
     if (this.state.project_id) await this.reconcile();
   }
   async reconcile() {
-    if (!this.state.project_id) return;
+    if (!this.state.project_id || this.state.purge_pending) return;
     const repo = new ProjectRepository(this.env.DB),
       ctx = this.context(),
-      w = await repo.readWorkspace(ctx.project_id);
+      unavailable = await repo.isUnavailable(ctx.project_id);
+    if (unavailable) return;
+    const w = await repo.readWorkspace(ctx.project_id);
     for (const run of w.runs.filter(
       (r) =>
         ["queued", "running"].includes(r.status) &&
@@ -179,7 +249,15 @@ export class ProjectSupervisor extends Agent<Env, RuntimeState> {
       );
   }
   async advanceRun(payload: { run_id: string; epoch: number }) {
-    if (this.inFlight.has(payload.run_id)) return;
+    if (
+      this.state.purge_pending ||
+      !this.state.project_id ||
+      (await new ProjectRepository(this.env.DB).isUnavailable(
+        this.state.project_id,
+      )) ||
+      this.inFlight.has(payload.run_id)
+    )
+      return;
     this.inFlight.add(payload.run_id);
     let recoveryId: string | undefined;
     const repo = new ProjectRepository(this.env.DB),
@@ -222,6 +300,7 @@ export class ProjectSupervisor extends Agent<Env, RuntimeState> {
         error instanceof Error && "code" in error
           ? String(error.code)
           : "STORAGE_UNAVAILABLE";
+      if (await repo.isUnavailable(ctx.project_id)) return;
       this.setState({ ...this.state, error_code: code });
       try {
         const w = await repo.readWorkspace(ctx.project_id),
@@ -234,7 +313,7 @@ export class ProjectSupervisor extends Agent<Env, RuntimeState> {
           await new TaskRunner(repo).fail(ctx, run, error);
       } catch {}
     } finally {
-      if (recoveryId) {
+      if (recoveryId && !(await repo.isUnavailable(ctx.project_id))) {
         try {
           const latest = await repo.readWorkspace(ctx.project_id),
             active = latest.runs.find((r) => r.id === payload.run_id);

@@ -15,11 +15,15 @@ export class RequestError extends Error {
     super(message);
   }
 }
-export async function request<T>(path: string, body?: unknown): Promise<T> {
+export async function request<T>(
+  path: string,
+  body?: unknown,
+  method?: string,
+): Promise<T> {
   let response: Response;
   try {
     response = await fetch(`/api/v1${path}`, {
-      method: body ? "POST" : "GET",
+      method: method ?? (body ? "POST" : "GET"),
       credentials: "same-origin",
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
@@ -59,6 +63,18 @@ export const api = {
       search?: string;
     }>("/session"),
   listProjects: () => request<ProjectSummary[]>("/projects"),
+  listDeletedProjects: () => request<ProjectSummary[]>("/projects/deleted"),
+  deleteProject: (id: string, permanent: boolean, confirmation_name?: string) =>
+    request<{ status: string }>(
+      `/projects/${encodeURIComponent(id)}`,
+      { permanent, confirmation_name },
+      "DELETE",
+    ),
+  restoreProject: (id: string) =>
+    request<{ status: string }>(
+      `/projects/${encodeURIComponent(id)}/restore`,
+      {},
+    ),
   createProject: (p: CreateProjectInput) =>
     request<{ id: string; revision: number }>("/projects", p),
   getWorkspace: (id: string) =>

@@ -1,3 +1,4 @@
+import deletionMigration from "../../db/migrations/0003_project_deletions.sql?raw";
 import { beforeAll, describe, it, expect } from "vitest";
 import { env } from "cloudflare:workers";
 import { ProjectRepository } from "../../db/repository";
@@ -7,6 +8,7 @@ import type { RoleResult } from "../../runtime/types";
 const db = (env as unknown as { DB: D1Database }).DB;
 beforeAll(async () => {
   await db.exec(migration);
+  await db.exec(deletionMigration);
 });
 const definition = {
   purpose: "独立解释 Agent 架构",

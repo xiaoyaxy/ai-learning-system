@@ -258,7 +258,16 @@ export class ConfiguredModelGateway implements ModelGateway {
         model: typeof carrier?.model === "string" ? carrier.model : name,
         generated_at: new Date().toISOString(),
       });
-    } catch {
+    } catch (error) {
+      console.warn("model_output_rejected", {
+        action: request.schema_name,
+        error_type: error instanceof Error ? error.name : "unknown",
+        finish_reason: carrier?.choices?.[0]?.finish_reason ?? null,
+        issues:
+          error instanceof z.ZodError
+            ? error.issues.map((i) => ({ code: i.code, path: i.path }))
+            : [],
+      });
       throw new ApiError("MODEL_INVALID_RESULT", 422);
     }
   }

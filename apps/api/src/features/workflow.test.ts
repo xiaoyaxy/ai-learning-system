@@ -1,3 +1,4 @@
+import deletionMigration from "../db/migrations/0003_project_deletions.sql?raw";
 import { beforeAll, afterEach, it, expect, vi } from "vitest";
 import { env } from "cloudflare:workers";
 import { ProjectRepository } from "../db/repository";
@@ -12,6 +13,7 @@ const db = (env as unknown as { DB: D1Database }).DB;
 beforeAll(async () => {
   await db.exec(migration);
   await db.exec(reviewMigration);
+  await db.exec(deletionMigration);
 });
 afterEach(() => vi.restoreAllMocks());
 async function fixture() {
@@ -33,7 +35,7 @@ const execute = async () => ({
   evidence_ids: [],
   usage: null,
 });
-it("resumes a diagnosis message through the task card after the plan already changed phase", async () => {
+it("waits for explicit start after the overall plan and replays the confirmation once", async () => {
   const { repo, p, ctx } = await fixture();
   await db
     .prepare("UPDATE projects SET phase='diagnosis' WHERE id=?")
@@ -95,26 +97,60 @@ it("resumes a diagnosis message through the task card after the plan already cha
   );
   const card = vi
     .spyOn(PlanningService.prototype, "createTaskCard")
-    .mockRejectedValueOnce(new Error("interrupt before task card"))
     .mockResolvedValue({
       id: "card",
       project_id: p.id,
       kind: "task_card",
       version: 1,
     });
-  await expect(
-    runLearningCommand(repo, ctx, run, execute, command, {
-      DEPLOYMENT_ENV: "local",
-      DEMO_MODE: "true",
-    } as Env),
-  ).rejects.toThrow("interrupt");
-  await expect(
-    runLearningCommand(repo, ctx, run, execute, command, {
-      DEPLOYMENT_ENV: "local",
-      DEMO_MODE: "true",
-    } as Env),
-  ).resolves.toBe(true);
-  expect(card).toHaveBeenCalledTimes(2);
+  const environment = { DEPLOYMENT_ENV: "local", DEMO_MODE: "true" } as Env;
+  await runLearningCommand(repo, ctx, run, execute, command, environment);
+  await runLearningCommand(repo, ctx, run, execute, command, environment);
+  expect(card).not.toHaveBeenCalled();
+  const waiting = await repo.readWorkspace(p.id);
+  expect(JSON.parse(waiting.project.pending_input_json!).kind).toBe(
+    "start_learning",
+  );
+  expect(
+    waiting.messages.filter(
+      (m) => m.sender_role === "supervisor" && m.body.includes("是否开始学习"),
+    ),
+  ).toHaveLength(1);
+  const no = {
+    type: "send_message" as const,
+    mode: "message" as const,
+    text: "先不开始",
+  };
+  const acceptNo = await repo.acceptCommand(ctx, {
+    client_operation_id: crypto.randomUUID(),
+    expected_revision: waiting.project.revision,
+    command: no,
+  });
+  const noRun = (await repo.readWorkspace(p.id)).runs.find(
+    (r) => r.id === acceptNo.run_id,
+  )!;
+  expect(await runLearningCommand(repo, ctx, noRun, execute, no)).toBe(false);
+  expect(card).not.toHaveBeenCalled();
+  await db
+    .prepare("UPDATE agent_runs SET status='waiting_user' WHERE id=?")
+    .bind(noRun.id)
+    .run();
+  const current = await repo.readWorkspace(p.id),
+    yes = {
+      type: "send_message" as const,
+      mode: "message" as const,
+      text: "开始",
+    };
+  const accepted = await repo.acceptCommand(ctx, {
+    client_operation_id: crypto.randomUUID(),
+    expected_revision: current.project.revision,
+    command: yes,
+  });
+  const yesRun = (await repo.readWorkspace(p.id)).runs.find(
+    (r) => r.id === accepted.run_id,
+  )!;
+  await runLearningCommand(repo, ctx, yesRun, execute, yes);
+  expect(card).toHaveBeenCalledTimes(1);
 });
 it("replays the fourth weekly answer into one report after the answer committed", async () => {
   const { repo, p, ctx } = await fixture();

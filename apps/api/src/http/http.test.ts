@@ -1,3 +1,4 @@
+import deletionMigration from "../db/migrations/0003_project_deletions.sql?raw";
 import { beforeAll, describe, it, expect } from "vitest";
 import { env } from "cloudflare:workers";
 import { generateKeyPair, exportJWK, SignJWT } from "jose";
@@ -10,6 +11,7 @@ import type { Env } from "../env";
 const db = (env as unknown as { DB: D1Database }).DB;
 beforeAll(async () => {
   await db.exec(migration);
+  await db.exec(deletionMigration);
 });
 async function fixture() {
   const repo = new ProjectRepository(db),
@@ -218,4 +220,83 @@ describe("protected public API", () => {
       }).payload,
     ).toEqual({ entity_id: "q" });
   });
+});
+
+it("publishes only safe material fields with summaries for existing projects", async () => {
+  const { repo, project } = await fixture();
+  const internal = await repo.readWorkspace(project.id);
+  internal.sources = [
+    {
+      id: "s1",
+      goal_version: 1,
+      reference_no: "M01",
+      title: "官方资料",
+      url: "https://docs.example.com/guide",
+      summary: "可阅读的搜索摘要",
+      layer: "intro",
+      status: "unavailable",
+      verification_status: "pending",
+      reference_answer: "PRIVATE_SOURCE_CANARY",
+    },
+    {
+      id: "unsafe",
+      goal_version: 1,
+      url: "javascript:alert(1)",
+      title: "unsafe",
+    },
+  ];
+  const dto = toWorkspaceDTO(internal) as any;
+  expect(dto.materials).toHaveLength(1);
+  expect(dto.materials[0]).toMatchObject({
+    id: "s1",
+    summary: "可阅读的搜索摘要",
+    url: "https://docs.example.com/guide",
+  });
+  expect(JSON.stringify(dto)).not.toContain("PRIVATE_SOURCE_CANARY");
+});
+it("exposes recoverable deletion and exact-name permanent deletion with ownership and origin checks", async () => {
+  const { app, project, testEnv } = await fixture(),
+    url = "https://app.test/api/v1/projects/" + project.id;
+  const remove = (body: unknown, origin = "https://app.test", env = testEnv) =>
+    app.request(
+      url,
+      {
+        method: "DELETE",
+        headers: { Origin: origin, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+      env,
+    );
+  expect(
+    (
+      await remove(
+        { permanent: true, confirmation_name: project.name },
+        "https://evil.test",
+      )
+    ).status,
+  ).toBe(403);
+  expect(
+    (
+      await remove({ permanent: false }, "https://app.test", {
+        ...testEnv,
+        DEV_OWNER_ID: "other",
+      })
+    ).status,
+  ).toBe(403);
+  expect((await remove({ permanent: false })).status).toBe(200);
+  expect((await app.request(url + "/workspace", {}, testEnv)).status).toBe(403);
+  const trash = (await (
+    await app.request("https://app.test/api/v1/projects/deleted", {}, testEnv)
+  ).json()) as any[];
+  expect(trash.map((p) => p.id)).toContain(project.id);
+  expect(
+    (await remove({ permanent: true, confirmation_name: "wrong" })).status,
+  ).toBe(422);
+  expect(
+    (await remove({ permanent: true, confirmation_name: project.name })).status,
+  ).toBe(200);
+  expect(
+    (await app.request("https://app.test/api/v1/projects/deleted", {}, testEnv))
+      .status,
+  ).toBe(200);
 });

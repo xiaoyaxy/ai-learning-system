@@ -235,7 +235,9 @@ export async function runLearningCommand(
       ["supervisor", "planner"].includes(command.target_role))
   ) {
     if (!message) throw new ApiError("INVALID_STAGE", 409);
-    await planner.scope(toolCtx, { message_id: message.id });
+    const outcome = await planner.scope(toolCtx, { message_id: message.id });
+    if (outcome.kind === "definition" && environment)
+      await prepareProject(repo, ctx, run, execute, environment);
     return true;
   }
   if (
@@ -257,7 +259,17 @@ export async function runLearningCommand(
     await prepareProject(repo, ctx, run, execute, environment);
     return true;
   }
-  if (command.type === "start_learning") {
+  if (
+    command.type === "start_learning" ||
+    (command.type === "send_message" &&
+      command.mode === "message" &&
+      route.pending_kind === "start_learning" &&
+      (!command.target_role ||
+        ["supervisor", "planner"].includes(command.target_role)) &&
+      /^(?:好[的]?[,，、\s]*)?(?:开始(?:学习)?|开始吧|开始学习吧)[!！。\s]*$/.test(
+        command.text.trim(),
+      ))
+  ) {
     if (w.project.phase !== "learning")
       throw new ApiError("INVALID_STAGE", 409);
     const parts = new Intl.DateTimeFormat("en-CA", {
@@ -308,14 +320,45 @@ async function prepareProject(
       review_ids: [],
     },
   );
-  const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: w.project.timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).formatToParts(new Date()),
-    date = ["year", "month", "day"]
-      .map((k) => parts.find((p) => p.type === k)!.value)
-      .join("-");
-  await planner.createTaskCard({ ...base, actor: "planner" }, date);
+  const current = await repo.readWorkspace(ctx.project_id);
+  const text =
+    "资料与整体学习计划已准备好。是否开始学习？回复“开始”或点击“开始学习”，规划师将给出今日学习内容和资料链接。";
+  await repo.commitStep(
+    {
+      ...base,
+      actor: "runtime",
+      step_key: "ask_start",
+      base_revision: current.project.revision,
+    },
+    {
+      project_changes: {
+        pending_input_json: JSON.stringify({
+          kind: "start_learning",
+          entity_id: current.project.active_plan_id ?? definition.id,
+          version: 1,
+          expected_role: "supervisor",
+        }),
+      },
+      run_changes: { run_id: run.id, status: "waiting_user" },
+      entities: [
+        {
+          table: "messages",
+          row: {
+            id: crypto.randomUUID(),
+            sender_role: "supervisor",
+            body: text,
+            run_id: run.id,
+          },
+        },
+      ],
+      events: [
+        {
+          type: "message_committed",
+          role: "supervisor",
+          run_id: run.id,
+          payload: { text },
+        },
+      ],
+    },
+  );
 }

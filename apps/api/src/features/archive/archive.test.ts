@@ -1,3 +1,4 @@
+import deletionMigration from "../../db/migrations/0003_project_deletions.sql?raw";
 import { beforeAll, it, expect } from "vitest";
 import { env } from "cloudflare:workers";
 import migration from "../../db/migrations/0001_initial.sql?raw";
@@ -11,6 +12,7 @@ const db = (env as unknown as { DB: D1Database }).DB;
 beforeAll(async () => {
   await db.exec(migration);
   await db.exec(reviewMigration);
+  await db.exec(deletionMigration);
 });
 async function fixture(text = "我懂了一点") {
   const repo = new ProjectRepository(db),

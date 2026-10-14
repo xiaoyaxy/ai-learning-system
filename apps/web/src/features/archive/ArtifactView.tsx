@@ -1,3 +1,4 @@
+import { MaterialLinks } from "../learning/LearningMaterials";
 import React from "react";
 import type { PublicArtifactDTO, WorkspaceDTO } from "@learning/contracts";
 export function ArtifactView({
@@ -53,7 +54,11 @@ export function ArtifactView({
             </h4>
             <p>技能：{t.skill_id}</p>
             <p>你的产出：{t.output}</p>
-            <Materials ids={t.material_ids} workspace={workspace} />
+            <Materials
+              ids={t.material_ids}
+              workspace={workspace}
+              artifact={artifact}
+            />
           </section>
         ))}
         <p>时间约束：{v.time_constraint_text || "待明确"}</p>
@@ -79,7 +84,11 @@ export function ArtifactView({
           </section>
         ))}
         <p>你的产出：{v.output}</p>
-        <Materials ids={v.material_ids} workspace={workspace} />
+        <Materials
+          ids={v.material_ids}
+          workspace={workspace}
+          artifact={artifact}
+        />
         {v.review_ids?.length > 0 && (
           <>
             <h4>到期复习</h4>
@@ -237,24 +246,20 @@ function Sources({ sources }: { sources: any[] }) {
 function Materials({
   ids,
   workspace,
+  artifact,
 }: {
   ids: string[];
   workspace?: WorkspaceDTO;
+  artifact?: PublicArtifactDTO;
 }) {
-  let catalog: any[] = [];
-  try {
-    catalog =
-      JSON.parse(
-        workspace?.artifacts.filter((a) => a.kind === "knowledge_map").at(-1)
-          ?.content ?? "{}",
-      ).source_catalog ?? [];
-  } catch {}
-  const sources = ids
-    ?.map((id) => catalog.find((s) => s.id === id))
-    .filter(Boolean);
-  return sources?.length ? (
-    <Sources sources={sources} />
+  return workspace ? (
+    <MaterialLinks
+      ids={ids}
+      workspace={workspace}
+      artifact={artifact}
+      summaries
+    />
   ) : (
-    <small>对应材料请在资料与知识地图中查阅。</small>
+    <small>请打开学习群查看对应资料。</small>
   );
 }

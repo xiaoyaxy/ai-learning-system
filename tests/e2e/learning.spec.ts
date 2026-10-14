@@ -13,20 +13,18 @@ async function create(page: Page, name: string) {
   await dialog.getByRole("button", { name: "创建学习群", exact: true }).click();
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
   await expect(
-    page.locator(".stage").getByText("了解你的起点", { exact: true }),
+    page.locator(".message.supervisor").getByText(/是否开始学习/),
   ).toBeVisible({ timeout: 30000 });
 }
 async function prepare(page: Page) {
-  await page
-    .getByLabel("消息正文")
-    .fill("我知道模型能生成文字，不清楚 Agent 如何调用工具。");
+  await page.getByLabel("消息正文").fill("开始");
   await page.getByRole("button", { name: "发送", exact: true }).click();
   await expect(
     page.locator(".stage").getByText("学习进行中", { exact: true }),
   ).toBeVisible({ timeout: 30000 });
   await expect(
     page.getByRole("button", { name: "独立练习", exact: true }),
-  ).toBeEnabled();
+  ).toBeEnabled({ timeout: 30000 });
 }
 test("项目群聊：两个项目隔离、独立答题、政策确认和成绩证据", async ({
   page,
@@ -228,8 +226,8 @@ test("项目群聊：暂停协作、刷新恢复和显式重试", async ({ page 
   await page.getByRole("button", { name: "继续", exact: true }).click();
   const retry = page.getByRole("button", { name: "重试步骤", exact: true });
   const diagnosis = page
-    .locator(".stage")
-    .getByText("了解你的起点", { exact: true });
+    .locator(".message.supervisor")
+    .getByText(/是否开始学习/);
   await expect(diagnosis.or(retry).first()).toBeVisible({ timeout: 30000 });
   if (await retry.isVisible()) await retry.click();
   await expect(diagnosis).toBeVisible({ timeout: 30000 });
@@ -248,13 +246,13 @@ test("项目群聊：答题反馈交接、延期请示和保留原目标", async
   await d.getByRole("button", { name: "创建学习群", exact: true }).click();
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
   await expect(
-    page.locator(".stage").getByText("了解你的起点", { exact: true }),
+    page.locator(".message.supervisor").getByText(/是否开始学习/),
   ).toBeVisible({ timeout: 30000 });
   await prepare(page);
   await page.getByRole("button", { name: "独立练习", exact: true }).click();
   for (let i = 0; i < 8; i++) {
     await expect(
-      page.getByRole("heading", {
+      page.locator(".question").getByRole("heading", {
         name: /Agent 与工具|如何把 Agent|请重新用自己的话/,
       }),
     ).toBeVisible({ timeout: 30000 });
@@ -402,7 +400,7 @@ test("项目群聊：修改政策草案与补充要求重新协调", async ({ pa
     .fill("保留目标与原期限，只重排材料顺序");
   await page.getByRole("button", { name: "原样保存并重新协调" }).click();
   await expect(page.getByLabel("学习群消息")).toContainText(
-    "补充要求已原样保存",
+    "已保存补充要求并停止旧任务",
   );
   await expect(
     page.getByRole("button", { name: "完成检验", exact: true }),
@@ -416,5 +414,50 @@ test("项目群聊：修改政策草案与补充要求重新协调", async ({ pa
   await page.getByRole("button", { name: "确认这份检验政策" }).click();
   await expect(
     page.getByRole("button", { name: "确认这份检验政策" }),
+  ).toHaveCount(0);
+});
+test("整体计划等待确认、今日内容与资料链接、删除恢复和彻底清除", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const name = `删除与资料验收 ${Date.now()}`;
+  await create(page, name);
+  await expect(page.locator(".resource-overview")).toContainText("份材料");
+  await expect(
+    page.getByRole("button", { name: "独立练习", exact: true }),
+  ).toBeDisabled();
+  await expect(page.locator(".inline-task")).toHaveCount(0);
+  await page.getByRole("button", { name: "开始学习", exact: true }).click();
+  const content = page.getByRole("dialog", { name: "学习内容与资料" });
+  await expect(content).toBeVisible({ timeout: 30000 });
+  await expect(content.getByRole("link").first()).toHaveAttribute(
+    "href",
+    /^https:/,
+  );
+  await expect(content).toContainText("学习内容");
+  await content.getByRole("button", { name: "关闭对话框" }).click();
+  await expect(page.locator(".workspace-header")).toContainText("Asia/Beijing");
+  await page.getByRole("button", { name: "删除群", exact: true }).click();
+  await page.getByRole("button", { name: "取消", exact: true }).click();
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "删除群", exact: true }).click();
+  await page.getByRole("button", { name: "移到已删除", exact: true }).click();
+  await expect(page.getByRole("heading", { name, exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "已删除学习群", exact: true }).click();
+  const row = page.locator(".deleted-project").filter({ hasText: name });
+  await row.getByRole("button", { name: "恢复学习群" }).click();
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  await expect(page.locator(".resource-overview")).toContainText("份材料");
+  await page.getByRole("button", { name: "删除群", exact: true }).click();
+  await page.getByRole("button", { name: "彻底删除", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "确认彻底删除" }),
+  ).toBeDisabled();
+  await page.getByLabel("输入学习群名称确认").fill(name);
+  await page.getByRole("button", { name: "确认彻底删除" }).click();
+  await expect(page.getByRole("heading", { name, exact: true })).toHaveCount(0);
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: `删除学习群 ${name}`, exact: true }),
   ).toHaveCount(0);
 });

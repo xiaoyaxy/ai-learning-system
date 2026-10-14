@@ -15,6 +15,15 @@ export function transition(
     "supplement_requirements",
   ];
   if (control.includes(command.type)) return { allowed: true };
+  if (
+    state.pending_kind === "start_learning" &&
+    [
+      "start_practice",
+      "start_completion_check",
+      "start_weekly_review",
+    ].includes(command.type)
+  )
+    return { allowed: false, code: "INVALID_STAGE" };
   if (command.type === "request_stage_jump")
     return { allowed: true, phase: command.phase, skipped: true };
   if (

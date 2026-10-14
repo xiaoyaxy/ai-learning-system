@@ -23,6 +23,13 @@ export default {
     return createApp({
       repo: new ProjectRepository(env.DB),
       dispatcher: {
+        remove: async (principal, projectId, permanent, confirmationName) => {
+          const ns =
+            env.PROJECT_SUPERVISOR as DurableObjectNamespace<ProjectSupervisor>;
+          await ns
+            .get(ns.idFromName(`${principal.owner_id}:${projectId}`))
+            .removeProject(principal, projectId, permanent, confirmationName);
+        },
         accept: async (principal, projectId, envelope) =>
           (await parent(principal, projectId)).accept(principal, envelope),
         wake: async (principal, projectId) => {

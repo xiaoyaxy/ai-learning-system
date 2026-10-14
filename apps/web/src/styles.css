@@ -1024,3 +1024,154 @@ details summary {
   color: #b42318;
   margin: 0;
 }
+/* Saved learning material and project controls */
+.resource-overview {
+  background: #f6f5ff;
+  border: 1px solid #e4e0f9;
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.resource-overview h2 {
+  font-size: 18px;
+  margin-top: 0;
+}
+.resource-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.resource-counts span {
+  background: white;
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #5143c9;
+  font-weight: 600;
+}
+.resource-overview details {
+  margin-top: 14px;
+}
+.course-link {
+  display: block;
+  text-align: left;
+  width: 100%;
+  padding: 12px;
+  margin: 6px 0;
+  background: #fff;
+  border: 1px solid #e4e0f9;
+  border-radius: 8px;
+}
+.course-link span {
+  display: block;
+  font-size: 12px;
+  color: #746c92;
+  margin-top: 5px;
+}
+.material-links section {
+  margin: 14px 0;
+}
+.material-links a {
+  color: #5442c7;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.material-links p {
+  line-height: 1.8;
+}
+.material-links small {
+  display: block;
+  color: #777;
+}
+.learning-content section {
+  border-bottom: 1px solid #eceaf2;
+  padding-bottom: 10px;
+}
+.learning-stages {
+  display: flex;
+  flex-wrap: wrap;
+  list-style: none;
+  padding: 0;
+  gap: 8px;
+  margin: 0 0 20px;
+  font-size: 12px;
+  color: #817b96;
+}
+.learning-stages li {
+  padding: 6px 9px;
+  border: 1px solid #e6e2f0;
+  border-radius: 20px;
+}
+.learning-stages .current {
+  color: #5442c7;
+  background: #efecff;
+  border-color: #cfc5fc;
+  font-weight: 600;
+}
+.learning-stages .done {
+  color: #407855;
+}
+.project-row {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+.project-row .project {
+  flex: 1;
+  min-width: 0;
+  padding-right: 25px;
+}
+.project-delete {
+  position: absolute;
+  right: 6px;
+  color: #777;
+  background: transparent;
+  border: 0;
+  width: 28px;
+  height: 32px;
+  font-size: 18px;
+}
+.project-delete:hover {
+  color: #b73545;
+  background: #fff1f1;
+  border-radius: 6px;
+}
+.trash-button {
+  width: 100%;
+  padding: 10px;
+  color: #767086;
+  background: transparent;
+  border: 0;
+}
+.delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+.danger {
+  background: #b83546;
+  color: white;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 16px;
+}
+.danger:disabled {
+  opacity: 0.4;
+}
+.deleted-project {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid #eee;
+}
+.deleted-project button {
+  margin-left: 8px;
+}
+.muted {
+  color: #777;
+  font-size: 13px;
+}

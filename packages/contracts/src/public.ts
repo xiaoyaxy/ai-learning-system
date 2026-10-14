@@ -84,7 +84,13 @@ export interface PublicQuestion {
   attempt_index: number;
 }
 export interface PendingInput {
-  kind: "scope" | "diagnosis" | "answer" | "decision" | "weekly_review";
+  kind:
+    | "scope"
+    | "diagnosis"
+    | "answer"
+    | "decision"
+    | "weekly_review"
+    | "start_learning";
   entity_id: string;
   version: number;
   expected_role: Role;
@@ -101,7 +107,18 @@ export interface CompletionEvidenceDTO {
     verdict: string | null;
   }[];
 }
+export interface PublicMaterialDTO {
+  id: string;
+  reference_no: string;
+  title: string;
+  url: string;
+  summary: string;
+  layer: string;
+  goal_version: number;
+  verification_status: string;
+}
 export interface WorkspaceDTO {
+  materials?: PublicMaterialDTO[];
   weekly_review?: {
     id: string;
     version: number;
@@ -145,6 +162,7 @@ export interface WorkspaceDTO {
     time_constraint_text: string;
     timezone: string;
     goal_version: number;
+    active_plan_id?: string | null;
   };
   phase: Phase;
   revision: number;

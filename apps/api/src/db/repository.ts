@@ -247,9 +247,134 @@ export class ProjectRepository {
     }
     return this.getProject(ownerId, id);
   }
+  async isUnavailable(projectId: string) {
+    const p = await this.db
+      .prepare(
+        "SELECT id FROM projects WHERE id=? AND NOT EXISTS(SELECT 1 FROM project_deletions WHERE project_id=projects.id)",
+      )
+      .bind(projectId)
+      .first();
+    return !p;
+  }
+  async listDeletedProjects(ownerId: string) {
+    return (
+      await this.db
+        .prepare(
+          "SELECT p.*,d.deleted_at FROM projects p JOIN project_deletions d ON d.project_id=p.id WHERE p.owner_id=? ORDER BY d.deleted_at DESC",
+        )
+        .bind(ownerId)
+        .all<ProjectRecord>()
+    ).results;
+  }
+  private async ownedProject(ownerId: string, projectId: string) {
+    const p = await this.db
+      .prepare("SELECT * FROM projects WHERE id=? AND owner_id=?")
+      .bind(projectId, ownerId)
+      .first<ProjectRecord>();
+    if (!p) throw new RepositoryError("FORBIDDEN");
+    return p;
+  }
+  async authorizeDeletion(
+    ownerId: string,
+    projectId: string,
+    permanent: boolean,
+    confirmationName?: string,
+  ) {
+    const p = await this.ownedProject(ownerId, projectId);
+    if (permanent && confirmationName !== p.name)
+      throw new RepositoryError("INVALID_REQUEST");
+    return p;
+  }
+  async isMissing(projectId: string) {
+    return !(await this.db
+      .prepare("SELECT id FROM projects WHERE id=?")
+      .bind(projectId)
+      .first());
+  }
+  async deleteProject(
+    ownerId: string,
+    projectId: string,
+    permanent: boolean,
+    confirmationName?: string,
+  ) {
+    await this.authorizeDeletion(
+      ownerId,
+      projectId,
+      permanent,
+      confirmationName,
+    );
+    const statements = [
+      this.db
+        .prepare(
+          "UPDATE projects SET run_epoch=run_epoch+1,revision=revision+1,active_run_id=NULL WHERE id=? AND NOT EXISTS(SELECT 1 FROM project_deletions WHERE project_id=projects.id)",
+        )
+        .bind(projectId),
+      this.db
+        .prepare(
+          "UPDATE agent_runs SET status='cancelled' WHERE project_id=? AND status IN ('queued','running','paused','waiting_user','waiting_decision')",
+        )
+        .bind(projectId),
+      this.db
+        .prepare(
+          "INSERT INTO project_deletions(project_id,deleted_at,permanent) VALUES(?,?,?) ON CONFLICT(project_id) DO UPDATE SET permanent=MAX(permanent,excluded.permanent)",
+        )
+        .bind(projectId, new Date().toISOString(), permanent ? 1 : 0),
+    ];
+    if (permanent) {
+      for (const table of [
+        "provider_calls",
+        "run_steps",
+        "step_receipts",
+        "command_receipts",
+        "domain_events",
+        "decisions",
+        "quiz_evaluations",
+        "quiz_attempts",
+        "question_secrets",
+        "quiz_questions",
+        "assessment_sessions",
+        "assessment_policies",
+        "review_schedule",
+        "plan_proposals",
+        "artifacts",
+        "project_constraints",
+        "sources",
+        "messages",
+        "agent_runs",
+        "project_creation_receipts",
+      ])
+        statements.push(
+          this.db
+            .prepare(`DELETE FROM ${table} WHERE project_id=?`)
+            .bind(projectId),
+        );
+      statements.push(
+        this.db
+          .prepare("DELETE FROM project_deletions WHERE project_id=?")
+          .bind(projectId),
+        this.db.prepare("DELETE FROM projects WHERE id=?").bind(projectId),
+      );
+    }
+    await this.db.batch(statements);
+  }
+  async restoreProject(ownerId: string, projectId: string) {
+    await this.ownedProject(ownerId, projectId);
+    await this.db.batch([
+      this.db
+        .prepare(
+          "UPDATE projects SET run_epoch=run_epoch+1,revision=revision+1 WHERE id=? AND EXISTS(SELECT 1 FROM project_deletions WHERE project_id=projects.id)",
+        )
+        .bind(projectId),
+      this.db
+        .prepare("DELETE FROM project_deletions WHERE project_id=?")
+        .bind(projectId),
+    ]);
+  }
   async getProject(ownerId: string, projectId: string): Promise<ProjectRecord> {
     const p = await this.db
-      .prepare("SELECT * FROM projects WHERE id=?")
+      .prepare(
+        "SELECT * FROM projects WHERE id=? AND NOT EXISTS(SELECT 1 FROM project_deletions WHERE project_id=projects.id)",
+      )
       .bind(projectId)
       .first<ProjectRecord>();
     if (!p || p.owner_id !== ownerId) throw new RepositoryError("FORBIDDEN");
@@ -259,7 +384,7 @@ export class ProjectRepository {
     return (
       await this.db
         .prepare(
-          "SELECT * FROM projects WHERE owner_id=? ORDER BY created_at DESC",
+          "SELECT * FROM projects WHERE owner_id=? AND NOT EXISTS(SELECT 1 FROM project_deletions WHERE project_id=projects.id) ORDER BY created_at DESC",
         )
         .bind(ownerId)
         .all<ProjectRecord>()
@@ -695,7 +820,11 @@ export class ProjectRepository {
       ["sources", ""],
     ];
     const batch = await this.db.batch([
-      this.db.prepare("SELECT * FROM projects WHERE id=?").bind(projectId),
+      this.db
+        .prepare(
+          "SELECT * FROM projects WHERE id=? AND NOT EXISTS(SELECT 1 FROM project_deletions WHERE project_id=projects.id)",
+        )
+        .bind(projectId),
       ...selections.map(([table, tail]) =>
         this.db
           .prepare(

@@ -5,6 +5,7 @@ import {
   type CompletionEvidenceDTO,
   type PendingInput,
 } from "@learning/contracts";
+import { publicHttpsUrl } from "../providers/source-reader";
 import type { WorkspaceRecord, EventRecord } from "../db/types";
 export const publicTimestamp = (s: string) =>
   s.includes("T") ? s : s.replace(" ", "T") + "Z";
@@ -43,6 +44,18 @@ export function toWorkspaceDTO(r: WorkspaceRecord): WorkspaceDTO {
     ? decode<string[]>(String(reflectionSession.question_ids_json), [])
     : [];
   return {
+    materials: r.sources
+      .filter((s) => publicHttpsUrl(String(s.url ?? "")))
+      .map((s) => ({
+        id: String(s.id),
+        reference_no: String(s.reference_no ?? ""),
+        title: String(s.title ?? "学习材料"),
+        url: String(s.url),
+        summary: String(s.summary ?? "").slice(0, 2000),
+        layer: String(s.layer ?? ""),
+        goal_version: Number(s.goal_version ?? 1),
+        verification_status: String(s.verification_status ?? "pending"),
+      })),
     project: {
       id: p.id,
       name: p.name,
@@ -50,6 +63,7 @@ export function toWorkspaceDTO(r: WorkspaceRecord): WorkspaceDTO {
       time_constraint_text: p.time_constraint_text,
       timezone: p.timezone,
       goal_version: p.goal_version,
+      active_plan_id: p.active_plan_id,
     },
     phase: p.phase,
     revision: p.revision,
