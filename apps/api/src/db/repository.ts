@@ -134,6 +134,7 @@ const columns: Record<EntityTable, string[]> = {
   review_schedule: [
     "id",
     "skill_id",
+    "goal_version",
     "learned_date",
     "offset_days",
     "due_date",
@@ -525,6 +526,17 @@ export class ProjectRepository {
           ),
       );
     }
+    if (writes.review_changes) {
+      if (ctx.actor !== "curator") throw new RepositoryError("FORBIDDEN");
+      const v = writes.review_changes;
+      statements.push(
+        this.db
+          .prepare(
+            "UPDATE review_schedule SET status=?,evidence_id=? WHERE project_id=? AND id=?",
+          )
+          .bind(v.status, v.evidence_id, ctx.project_id, v.id),
+      );
+    }
     if (writes.provider_changes) {
       const { id, ...v } = writes.provider_changes;
       const ks = Object.keys(v);
@@ -583,10 +595,16 @@ export class ProjectRepository {
       result,
     };
   }
-  async readWorkspace(projectId: string): Promise<WorkspaceRecord> {
+  async readWorkspace(
+    projectId: string,
+    fullHistory = false,
+  ): Promise<WorkspaceRecord> {
     // All reads share a D1 transaction: never pair a prior revision with newer facts.
     const selections = [
-      ["messages", "ORDER BY seq DESC LIMIT 50"],
+      [
+        "messages",
+        fullHistory ? "ORDER BY seq DESC" : "ORDER BY seq DESC LIMIT 50",
+      ],
       ["artifacts", "ORDER BY version"],
       ["agent_runs", "ORDER BY created_at DESC"],
       ["quiz_questions", ""],
@@ -603,7 +621,11 @@ export class ProjectRepository {
       this.db.prepare("SELECT * FROM projects WHERE id=?").bind(projectId),
       ...selections.map(([table, tail]) =>
         this.db
-          .prepare(`SELECT * FROM ${table} WHERE project_id=? ${tail}`)
+          .prepare(
+            table === "quiz_attempts"
+              ? "SELECT a.*,m.body AS answer_text FROM quiz_attempts a JOIN messages m ON a.project_id=m.project_id AND a.answer_message_id=m.id WHERE a.project_id=? ORDER BY a.rowid"
+              : `SELECT * FROM ${table} WHERE project_id=? ${tail}`,
+          )
           .bind(projectId),
       ),
       this.db

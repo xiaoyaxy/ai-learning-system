@@ -11,6 +11,7 @@ import { authenticate, type Principal } from "./auth";
 import { toWorkspaceDTO, toPublicEvent } from "./projector";
 import { ApiError, publicError } from "./errors";
 import type { Env } from "../env";
+import { exportProject } from "../features/archive/export";
 export interface CommandDispatcher {
   accept(
     principal: Principal,
@@ -139,7 +140,15 @@ export function createApp(deps: {
   });
   app.get("/api/v1/projects/:id/export", async (c) => {
     await deps.repo.getProject(c.get("principal").owner_id, c.req.param("id"));
-    throw new ApiError("NOT_IMPLEMENTED", 501);
+    const record = await deps.repo.readWorkspace(c.req.param("id"), true);
+    return c.body(
+      exportProject(record, toWorkspaceDTO(record).artifacts),
+      200,
+      {
+        "Content-Type": "text/markdown; charset=utf-8",
+        "Content-Disposition": `attachment; filename="learning-${record.project.id}.md"`,
+      },
+    );
   });
   app.onError((error, c) => {
     if (error.name === "ZodError")

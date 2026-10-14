@@ -145,12 +145,16 @@ test("项目群聊：断网草稿保留和重新连接", async ({ page, context 
   await context.setOffline(false);
   await page.getByRole("button", { name: "发送", exact: true }).click();
   await expect(
-    page.getByLabel("学习群消息").getByText("这段起点诊断应该保留", { exact: true }),
+    page
+      .getByLabel("学习群消息")
+      .getByText("这段起点诊断应该保留", { exact: true }),
   ).toBeVisible({ timeout: 30000 });
-  await expect(page.getByLabel('消息正文')).toHaveValue('');
+  await expect(page.getByLabel("消息正文")).toHaveValue("");
   await page.reload();
   await expect(
-    page.getByLabel("学习群消息").getByText("这段起点诊断应该保留", { exact: true }),
+    page
+      .getByLabel("学习群消息")
+      .getByText("这段起点诊断应该保留", { exact: true }),
   ).toBeVisible({ timeout: 30000 });
 });
 
@@ -254,4 +258,104 @@ test("项目群聊：答题反馈交接、延期请示和保留原目标", async
     page.getByRole("heading", { name: "调整可能影响原定目标" }),
   ).toHaveCount(0);
   await expect(page.locator(".workspace-header")).toContainText("2026-10-28");
+});
+
+test("归档与成果：原稿、审稿、终稿、笔记版本和复盘导出", async ({ page }) => {
+  await page.goto("/");
+  await create(page, `Archive ${Date.now()}`);
+  await prepare(page);
+  const entry = page.getByRole("button", { name: "项目档案", exact: true });
+  await expect(entry).toBeVisible({ timeout: 2000 });
+  await entry.click();
+  await page.getByRole("button", { name: "提交初稿", exact: true }).click();
+  const draft = "我的草稿，标点和原话都保留。\n\nAgent 决策，工具执行。";
+  await page.getByLabel("你的原稿").fill(draft);
+  await page.getByRole("button", { name: "原样提交初稿" }).click();
+  await expect(
+    page.getByRole("button", { name: "审稿意见 · v1", exact: true }),
+  ).toBeVisible({ timeout: 30000 });
+  await page
+    .getByRole("button", { name: "第一版成果 · v1", exact: true })
+    .click();
+  const view = page.getByRole("dialog", { name: "第一版成果 · v1" });
+  await expect(view).toContainText("我的草稿，标点和原话都保留。");
+  await view.getByRole("button", { name: "关闭对话框" }).click();
+  await page.getByRole("button", { name: "提交终稿", exact: true }).click();
+  await page.getByLabel("你的原稿").fill("我的终稿，由我自己决定表达。");
+  await page.getByRole("button", { name: "原样提交终稿" }).click();
+  await expect(
+    page.getByRole("button", { name: "最终成果 · v1", exact: true }),
+  ).toBeVisible({ timeout: 30000 });
+  await page.getByRole("button", { name: "保存笔记", exact: true }).click();
+  await page.getByLabel("笔记正文").fill("我的笔记，未由 AI 扩写。");
+  await page.getByRole("button", { name: "保存这个新版本" }).click();
+  await expect(
+    page.getByRole("button", { name: "学习笔记 · v1", exact: true }),
+  ).toBeVisible({ timeout: 30000 });
+  await page
+    .getByRole("dialog", { name: "项目档案" })
+    .getByRole("button", { name: "关闭对话框" })
+    .click();
+  await page.getByRole("button", { name: "每周复盘", exact: true }).click();
+  for (let i = 0; i < 4; i++) {
+    await expect(page.locator(".weekly-question")).toContainText(
+      `${i + 1} / 4`,
+    );
+    await page.getByLabel("消息正文").fill(`复盘回答 ${i}`);
+    await page.getByRole("button", { name: "发送", exact: true }).click();
+    if (i < 3)
+      await expect(page.locator(".weekly-question")).toContainText(
+        `${i + 2} / 4`,
+      );
+    else await expect(page.locator(".weekly-question")).toHaveCount(0);
+  }
+  await page.getByRole("button", { name: "项目档案", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "每周复盘 · v1", exact: true }),
+  ).toBeVisible();
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("link", { name: "下载 Markdown 档案" }).click(),
+  ]);
+  expect(download.suggestedFilename()).toMatch(/learning-.*\.md/);
+});
+
+test("归档与成果：学习卡引用、两次复习和笔记删除标记", async ({ page }) => {
+  await page.goto("/");
+  await create(page, `Cards ${Date.now()}`);
+  await prepare(page);
+  await page.getByRole("button", { name: "项目档案", exact: true }).click();
+  await page.getByRole("button", { name: "记录学习卡", exact: true }).click();
+  for (const [label, value] of [
+    ["资料要解决的问题", "如何理解 Agent"],
+    ["我读懂的第一个点", "Agent 负责决策"],
+    ["我读懂的第二个点", "工具负责执行"],
+    ["我读懂的第三个点", "反馈帮助修正路径"],
+    ["最有帮助的例子", "学习助手先确定问题再调用搜索"],
+    ["仍说不清的地方", "还不清楚长期记忆怎么实现"],
+  ])
+    await page.getByLabel(label, { exact: true }).fill(value);
+  await page.getByRole("button", { name: "整理这张学习卡" }).click();
+  await expect(
+    page.getByRole("button", { name: "学习卡 · v1", exact: true }),
+  ).toBeVisible({ timeout: 30000 });
+  await expect(
+    page.getByRole("button", { name: "记录这次复习", exact: true }),
+  ).toHaveCount(2);
+  await page.getByRole("button", { name: "保存笔记", exact: true }).click();
+  await page.getByLabel("笔记正文").fill("这是我的原笔记");
+  await page.getByRole("button", { name: "保存这个新版本" }).click();
+  await expect(
+    page.getByRole("button", { name: "学习笔记 · v1", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "标记删除笔记", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "学习笔记 · v2 · 删除标记", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "学习笔记 · v1", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "学习笔记 · v1" }),
+  ).toContainText("这是我的原笔记");
 });

@@ -32,6 +32,16 @@ export function toWorkspaceDTO(r: WorkspaceRecord): WorkspaceDTO {
     .filter((e) => e.attempt_id === attempts.at(-1)?.id)
     .at(-1);
   const canAnswer = attempts.length === 0 || !!evaluation?.followup;
+  const reflection =
+    pending?.kind === "weekly_review"
+      ? r.questions.find((q) => q.id === pending.entity_id)
+      : null;
+  const reflectionSession = r.sessions.find(
+    (s) => s.id === reflection?.session_id,
+  );
+  const reflectionIds = reflectionSession
+    ? decode<string[]>(String(reflectionSession.question_ids_json), [])
+    : [];
   return {
     project: {
       id: p.id,
@@ -45,6 +55,62 @@ export function toWorkspaceDTO(r: WorkspaceRecord): WorkspaceDTO {
     revision: p.revision,
     run_epoch: p.run_epoch,
     pending_input: pending,
+    weekly_review: reflection
+      ? {
+          id: String(reflection.id),
+          version: Number(reflection.version),
+          prompt: String(reflection.prompt),
+          index: reflectionIds.indexOf(String(reflection.id)) + 1,
+          total: reflectionIds.length,
+        }
+      : null,
+    reviews: r.reviews.map((v) => ({
+      id: String(v.id),
+      skill_id: String(v.skill_id),
+      goal_version: Number(v.goal_version ?? 1),
+      due_date: String(v.due_date),
+      form: String(v.form),
+      status: String(v.status),
+    })),
+    assessments: r.questions
+      .filter(
+        (q) =>
+          pending?.entity_id === q.id ||
+          r.attempts.some((a) => a.question_id === q.id),
+      )
+      .map((q) => {
+        const s = r.sessions.find((s) => s.id === q.session_id);
+        return {
+          question_id: String(q.id),
+          prompt: String(q.prompt),
+          session_id: String(q.session_id),
+          purpose: String(s?.purpose ?? "unknown"),
+          goal_version: Number(s?.goal_version ?? 0),
+          attempts: r.attempts
+            .filter((a) => a.question_id === q.id)
+            .map((a) => ({
+              id: String(a.id),
+              index: Number(a.attempt_index),
+              answer_message_id: String(a.answer_message_id),
+              text: String(
+                a.answer_text ??
+                  r.messages.find((m) => m.id === a.answer_message_id)?.body ??
+                  "",
+              ),
+              evaluations: r.evaluations
+                .filter((e) => e.attempt_id === a.id)
+                .map((e) => ({
+                  id: String(e.id),
+                  verdict: String(e.verdict),
+                  feedback: String(e.feedback),
+                  followup: e.followup == null ? null : String(e.followup),
+                  reveal_allowed: !!e.reveal_allowed,
+                  policy_version:
+                    e.policy_version == null ? null : Number(e.policy_version),
+                })),
+            })),
+        };
+      }),
     active_run: run
       ? { id: run.id, status: run.status, error_code: run.error_code }
       : null,
@@ -78,15 +144,15 @@ export function toWorkspaceDTO(r: WorkspaceRecord): WorkspaceDTO {
       text: m.body,
       created_at: publicTimestamp(m.created_at),
     })),
-    artifacts: r.artifacts
-      .filter((a) => !a.tombstone)
-      .map((a) => ({
-        id: a.id,
-        kind: a.kind,
-        version: a.version,
-        content: a.content,
-        created_at: publicTimestamp(a.created_at),
-      })),
+    artifacts: r.artifacts.map((a) => ({
+      tombstone: !!a.tombstone,
+      supersedes_id: a.supersedes_id,
+      id: a.id,
+      kind: a.kind,
+      version: a.version,
+      content: a.content,
+      created_at: publicTimestamp(a.created_at),
+    })),
     latest_seq: r.latest_seq,
     completion: decode<CompletionEvidenceDTO>(p.completion_json, {
       status: "policy_required",

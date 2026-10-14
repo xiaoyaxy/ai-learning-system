@@ -130,6 +130,50 @@ export function demoResult(task: RoleTask): RoleResult {
       };
       break;
     }
+    case "learning_card": {
+      const m = (x.evidence as { id: string; text: string }[])[0],
+        field = (label: string) => {
+          const value = new RegExp("(?:^|\\n)" + label + "：([^\\n]*)").exec(
+            m.text,
+          )?.[1];
+          return value ? { text: value, message_id: m.id } : null;
+        };
+      content = {
+        problem: field("资料要解决的问题"),
+        understood_points: [
+          field("读懂1"),
+          field("读懂2"),
+          field("读懂3"),
+        ].filter(Boolean),
+        helpful_example: field("最有帮助的例子"),
+        unclear: field("仍说不清的地方"),
+        skill_id: (x.skills as string[])[0] ?? "concept",
+      };
+      break;
+    }
+    case "review_draft": {
+      const paragraphs = x.paragraphs as { index: number; text: string }[],
+        p = paragraphs[0],
+        quote = p.text.slice(0, Math.min(12, p.text.length));
+      content = {
+        comments: [
+          {
+            paragraph_index: p.index,
+            quote,
+            issue: "演示：论点还需要具体例子",
+            action: "补充一个你亲自观察的例子，不需要照抄资料",
+          },
+        ],
+        fact_checks: [
+          {
+            quote,
+            reason: "演示：涉及版本、数据或专业内容时，核对可靠原始来源",
+            status: "needs_manual_verification",
+          },
+        ],
+      };
+      break;
+    }
     case "route":
       content = { role: "coach" };
       break;

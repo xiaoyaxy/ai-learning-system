@@ -336,3 +336,52 @@ describe("confirmed assessment policy and fixed sessions", () => {
     });
   });
 });
+
+it("rechecks an uncertain grade by appending an evaluation without another answer", async () => {
+  const { repo, owner, p, ctx, service } = await fixture("needs_review"),
+    attempt = await service.submit(ctx, {
+      question_id: "q",
+      question_version: 1,
+      attempt_index: 1,
+      text: "不确定",
+    });
+  await service.evaluate(ctx, attempt);
+  const w = await repo.readWorkspace(p.id),
+    op = crypto.randomUUID(),
+    accepted = await repo.acceptCommand(
+      { owner_id: owner, project_id: p.id },
+      {
+        client_operation_id: op,
+        expected_revision: w.project.revision,
+        command: { type: "reassess_answer", attempt_id: attempt.id },
+      },
+    );
+  const rechecker = new AssessmentService(repo, async () => ({
+    kind: "evaluation",
+    content: {
+      verdict: "correct",
+      gap_category: "none",
+      gap: "",
+      evidence_quote: "不确定",
+    },
+    evidence_ids: [],
+    usage: null,
+  }));
+  await rechecker.evaluate(
+    { ...ctx, operation_id: op, run_id: accepted.run_id },
+    attempt,
+    { recheck: true },
+  );
+  await rechecker.evaluate(
+    { ...ctx, operation_id: op, run_id: accepted.run_id },
+    attempt,
+    { recheck: true },
+  );
+  const after = await repo.readWorkspace(p.id);
+  expect(after.attempts).toHaveLength(1);
+  expect(after.evaluations).toHaveLength(2);
+  expect(after.evaluations[1]).toMatchObject({
+    verdict: "correct",
+    supersedes_id: after.evaluations[0].id,
+  });
+});

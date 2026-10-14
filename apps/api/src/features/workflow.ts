@@ -10,6 +10,7 @@ import { PlanningService } from "./planning/service";
 import { ApiError } from "../http/errors";
 import { AssessmentService } from "./assessment/service";
 import { toWorkspaceDTO } from "../http/projector";
+import { ArchiveService } from "./archive/service";
 export async function runLearningCommand(
   repo: ProjectRepository,
   ctx: IngressContext,
@@ -34,6 +35,82 @@ export async function runLearningCommand(
     };
   const assessment = new AssessmentService(repo, execute),
     coachCtx = { ...toolCtx, actor: "coach" as const };
+  const archive = new ArchiveService(repo, execute),
+    curatorCtx = { ...toolCtx, actor: "curator" as const },
+    pending = w.project.pending_input_json
+      ? JSON.parse(w.project.pending_input_json)
+      : null;
+  if (command.type === "reassess_answer") {
+    const a = w.attempts.find((a) => a.id === command.attempt_id);
+    if (!a) throw new ApiError("FORBIDDEN", 403);
+    await assessment.evaluate(
+      coachCtx,
+      {
+        id: String(a.id),
+        question_id: String(a.question_id),
+        attempt_index: Number(a.attempt_index),
+      },
+      { recheck: true },
+    );
+    return true;
+  }
+  if (command.type === "record_learning") {
+    if (!message) throw new ApiError("INVALID_STAGE", 409);
+    await archive.createLearningCard(curatorCtx, [message.id]);
+    return true;
+  }
+  if (command.type === "save_note") {
+    await archive.saveNote(
+      curatorCtx,
+      command.text,
+      command.base_note
+        ? { ...command.base_note, project_id: ctx.project_id, kind: "note" }
+        : undefined,
+    );
+    await archive.createIndex(curatorCtx);
+    return true;
+  }
+  if (command.type === "delete_note") {
+    await archive.deleteNote(curatorCtx, {
+      id: command.note_id,
+      version: command.note_version,
+      project_id: ctx.project_id,
+      kind: "note",
+    });
+    await archive.createIndex(curatorCtx);
+    return true;
+  }
+  if (command.type === "complete_review") {
+    await archive.completeReview(curatorCtx, command.review_id, command.text);
+    await archive.createIndex(curatorCtx);
+    return true;
+  }
+  if (command.type === "submit_draft" || command.type === "submit_final") {
+    const ref = await archive.submitUserArtifact(
+      { ...toolCtx, actor: "trusted_ingress" },
+      {
+        kind: command.type === "submit_draft" ? "draft" : "final",
+        text: command.text,
+      },
+    );
+    if (command.type === "submit_draft")
+      await archive.reviewDraft(coachCtx, ref);
+    await archive.createIndex(curatorCtx);
+    return true;
+  }
+  if (command.type === "start_weekly_review") {
+    await archive.startWeeklyReview(curatorCtx);
+    return true;
+  }
+  if (
+    command.type === "send_message" &&
+    command.mode === "answer" &&
+    pending?.kind === "weekly_review" &&
+    (!command.target_role || command.target_role === "curator")
+  ) {
+    await archive.answerWeekly(curatorCtx, command.text);
+    return true;
+  }
   if (command.type === "decide_proposal") {
     await planner.recordDecision(toolCtx, command);
     return true;

@@ -208,13 +208,38 @@ export class AssessmentService {
   async evaluate(
     ctx: ToolContext,
     attempt: AttemptRef,
+    options: { recheck?: boolean } = {},
   ): Promise<{ id: string; reveal_allowed: boolean; verdict: string }> {
+    await this.repo.getProject(ctx.owner_id, ctx.project_id);
+    const key = options.recheck
+      ? `recheck:${attempt.id}`
+      : `grade:${attempt.id}`;
+    const receipt = await this.repo.readReceipt(
+      ctx.project_id,
+      ctx.operation_id,
+      key,
+    );
+    if (receipt)
+      return {
+        id: String(receipt.result.id),
+        reveal_allowed: !!receipt.result.reveal_allowed,
+        verdict: String(receipt.result.verdict),
+      };
     const w = await this.repo.readWorkspace(ctx.project_id),
       a = w.attempts.find((a) => a.id === attempt.id),
       q = w.questions.find((q) => q.id === a?.question_id),
       s = w.sessions.find((s) => s.id === q?.session_id),
       secret = w.secrets.find((x) => x.question_id === q?.id),
-      answer = w.messages.find((m) => m.id === a?.answer_message_id);
+      answer = a
+        ? {
+            id: String(a.answer_message_id),
+            body: String(
+              a.answer_text ??
+                w.messages.find((m) => m.id === a.answer_message_id)?.body ??
+                "",
+            ),
+          }
+        : null;
     if (
       !a ||
       !q ||
@@ -224,9 +249,10 @@ export class AssessmentService {
       Number(s.goal_version) !== w.project.goal_version
     )
       throw new ApiError("FORBIDDEN", 403);
-    const key = `grade:${a.id}`,
-      prior = w.evaluations.filter((e) => e.attempt_id === a.id).at(-1);
-    if (prior)
+    const prior = w.evaluations.filter((e) => e.attempt_id === a.id).at(-1);
+    if (options.recheck && prior?.verdict !== "needs_review")
+      throw new ApiError("INVALID_STAGE", 409);
+    if (prior && !options.recheck)
       return {
         id: String(prior.id),
         reveal_allowed: !!prior.reveal_allowed,
@@ -267,6 +293,14 @@ export class AssessmentService {
           private_context: {
             reference_answer: secret.reference_answer,
             rubric: JSON.parse(String(secret.rubric_json)),
+            assessment_policy: s.policy_id
+              ? (JSON.parse(
+                  String(
+                    w.policies.find((p) => p.id === s.policy_id)?.policy_json ??
+                      "{}",
+                  ),
+                ).rubric ?? null)
+              : null,
           },
         });
         EvaluationSchema.parse(result.content);
@@ -339,6 +373,7 @@ export class AssessmentService {
                 feedback,
                 followup,
                 reveal_allowed: reveal ? 1 : 0,
+                supersedes_id: prior ? String(prior.id) : null,
               },
             },
             {
@@ -365,7 +400,16 @@ export class AssessmentService {
                   phase: next ? ("practicing" as const) : ("learning" as const),
                 }),
           },
-          run_changes: { run_id: ctx.run_id, status: "waiting_user" },
+          run_changes: {
+            run_id: ctx.run_id,
+            status:
+              reveal &&
+              !next &&
+              ["incorrect", "partial"].includes(e.verdict) &&
+              current.project.active_plan_id
+                ? "running"
+                : "waiting_user",
+          },
           events: [
             {
               type: "feedback_committed",

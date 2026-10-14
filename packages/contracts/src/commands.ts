@@ -22,6 +22,28 @@ export const ProjectCommandSchema = z.discriminatedUnion("type", [
   typed("start_practice"),
   typed("start_completion_check"),
   typed("start_weekly_review"),
+  z.object({ type: z.literal("record_learning"), text }).strict(),
+  z
+    .object({
+      type: z.literal("save_note"),
+      text,
+      base_note: z
+        .object({ id, version: z.number().int().positive() })
+        .strict()
+        .optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("delete_note"),
+      note_id: id,
+      note_version: z.number().int().positive(),
+    })
+    .strict(),
+  z
+    .object({ type: z.literal("complete_review"), review_id: id, text })
+    .strict(),
+  z.object({ type: z.literal("reassess_answer"), attempt_id: id }).strict(),
   z
     .object({
       type: z.literal("submit_answer"),

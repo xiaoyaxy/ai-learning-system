@@ -19,6 +19,7 @@ export function transition(
     return { allowed: true, phase: command.phase, skipped: true };
   if (
     state.pending_kind === "answer" &&
+    command.type !== "reassess_answer" &&
     command.type !== "submit_answer" &&
     !(command.type === "send_message" && command.mode === "answer")
   )

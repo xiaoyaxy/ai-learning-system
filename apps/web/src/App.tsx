@@ -1,3 +1,7 @@
+import { artifactNames } from "./lib/labels";
+import { Dialog } from "./components/Dialog";
+import { ArtifactView } from "./features/archive/ArtifactView";
+import { ArchivePanel } from "./features/archive/ArchivePanel";
 import React, { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
@@ -44,20 +48,7 @@ const completionNames: Record<string, string> = {
   met: "已达到完成标准",
   stale: "目标已改变，旧证据过期",
 };
-const artifactNames: Record<string, string> = {
-  definition: "项目定义",
-  diagnosis: "起点诊断",
-  knowledge_map: "资料与知识地图",
-  plan: "学习计划",
-  task_card: "今日学习安排",
-  learning_card: "学习卡",
-  note: "学习笔记",
-  draft: "第一版成果",
-  final: "最终成果",
-  review_comments: "审稿意见",
-  weekly_report: "每周复盘",
-  index: "档案索引",
-};
+
 export function App() {
   const projects = useQuery({
       queryKey: ["projects"],
@@ -200,6 +191,7 @@ function Workspace({ projectId }: { projectId: string }) {
     [error, setError] = useState(""),
     [details, setDetails] = useState(false),
     [artifact, setArtifact] = useState<PublicArtifactDTO | null>(null),
+    [archives, setArchives] = useState(false),
     lock = useRef(false),
     active = ["queued", "running"].includes(w?.active_run?.status ?? ""),
     { events, status } = useProjectEvents(
@@ -259,6 +251,7 @@ function Workspace({ projectId }: { projectId: string }) {
           </div>
           <div className="header-actions">
             <button onClick={() => setDetails(true)}>群资料</button>
+            <button onClick={() => setArchives(true)}>项目档案</button>
             {run && active && (
               <button
                 onClick={() =>
@@ -450,6 +443,15 @@ function Workspace({ projectId }: { projectId: string }) {
               </div>
             </div>
           )}
+          {w.weekly_review && (
+            <div className="card weekly-question">
+              <span className="eyebrow">
+                每周复盘 · {w.weekly_review.index} / {w.weekly_review.total}
+              </span>
+              <h2>{w.weekly_review.prompt}</h2>
+              <p>用自己的话回答，我会逐次保存你的原话。</p>
+            </div>
+          )}
           {w.question && (
             <div
               className="card question"
@@ -546,7 +548,7 @@ function Workspace({ projectId }: { projectId: string }) {
           <Composer
             key={projectId}
             projectId={projectId}
-            answer={!!w.question}
+            answer={!!w.question || !!w.weekly_review}
             busy={busy || active}
             onSend={async (c) => {
               if (
@@ -572,6 +574,34 @@ function Workspace({ projectId }: { projectId: string }) {
         </footer>
       </main>
       <aside className="context-panel">{context}</aside>
+      {archives && (
+        <Dialog title="项目档案" onClose={() => setArchives(false)}>
+          <ArchivePanel
+            workspace={w}
+            busy={busy || active}
+            onSend={send}
+            onView={setArtifact}
+          />
+        </Dialog>
+      )}
+      {w.assessments
+        ?.flatMap((q) => q.attempts)
+        .filter((a) => a.evaluations.at(-1)?.verdict === "needs_review")
+        .map((a) => (
+          <div className="review-notice" key={a.id}>
+            <span>这条答案正在等待复核，原文与历史评价会保留。</span>
+            <button
+              disabled={busy || active}
+              onClick={() =>
+                void send({ type: "reassess_answer", attempt_id: a.id }).catch(
+                  () => {},
+                )
+              }
+            >
+              重新复核原答案
+            </button>
+          </div>
+        ))}
       {details && (
         <Dialog title="群资料" onClose={() => setDetails(false)}>
           {context}
@@ -582,7 +612,7 @@ function Workspace({ projectId }: { projectId: string }) {
           title={`${artifactNames[artifact.kind] ?? artifact.kind} · v${artifact.version}`}
           onClose={() => setArtifact(null)}
         >
-          <ArtifactView artifact={artifact} />
+          <ArtifactView artifact={artifact} workspace={w} />
         </Dialog>
       )}
     </>
@@ -699,82 +729,23 @@ function Context({
             <button
               className="archive-link"
               key={kind}
-              disabled={!latest}
+              disabled={!latest || !!latest.tombstone}
               onClick={() => latest && onArtifact(latest)}
             >
               <span>{name}</span>
-              <small>{latest ? `v${latest.version} ›` : "尚未生成"}</small>
+              <small>
+                {latest
+                  ? latest.tombstone
+                    ? "已标记删除"
+                    : `v${latest.version} ›`
+                  : "尚未生成"}
+              </small>
             </button>
           );
         })}
         <small>原始诊断与答案只追加保存</small>
       </section>
     </>
-  );
-}
-export function ArtifactView({ artifact }: { artifact: PublicArtifactDTO }) {
-  let value: any;
-  try {
-    value = JSON.parse(artifact.content);
-  } catch {
-    return <div className="preserve">{artifact.content}</div>;
-  }
-  return (
-    <>
-      <pre className="artifact-content">{JSON.stringify(value, null, 2)}</pre>
-      {value.source_catalog?.map((s: any) => {
-        let url: string | undefined;
-        try {
-          const u = new URL(s.url);
-          if (u.protocol === "https:" && !u.username && !u.password)
-            url = u.href;
-        } catch {}
-        return (
-          <p key={s.id}>
-            {url ? (
-              <a href={url} target="_blank" rel="noopener noreferrer">
-                {s.reference_no} · {s.title}
-              </a>
-            ) : (
-              s.title
-            )}
-            <small>
-              {" "}
-              · {s.verification_status === "verified"
-                ? "已核对"
-                : "待核对"} · {s.status}
-            </small>
-          </p>
-        );
-      })}
-    </>
-  );
-}
-function Dialog({
-  title,
-  onClose,
-  children,
-}: {
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    ref.current?.showModal();
-    ref.current?.querySelector<HTMLInputElement>("input, textarea")?.focus();
-    return () => ref.current?.close();
-  }, []);
-  return (
-    <dialog ref={ref} onCancel={onClose}>
-      <div className="dialog-heading">
-        <h2>{title}</h2>
-        <button aria-label="关闭对话框" onClick={onClose}>
-          ×
-        </button>
-      </div>
-      {children}
-    </dialog>
   );
 }
 function CreateDialog({
@@ -885,6 +856,8 @@ function MessageContent({
     resume_run: "继续协作",
     retry_run: "重试当前步骤",
     cancel_run: "取消任务",
+    delete_note: "标记删除笔记",
+    reassess_answer: "复核已保存的答案",
     request_stage_jump: "按自己的选择跳转学习阶段",
   };
   if (commandType && actions[commandType])

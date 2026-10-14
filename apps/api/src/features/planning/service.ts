@@ -419,7 +419,10 @@ export class PlanningService {
     if (!plan) throw new ApiError("INVALID_STAGE", 409);
     const reviews = w.reviews.filter(
       (r) =>
-        r.due_date && String(r.due_date) <= localDate && r.status === "pending",
+        r.due_date &&
+        String(r.due_date) <= localDate &&
+        r.status === "pending" &&
+        Number(r.goal_version ?? 1) === w.project.goal_version,
     );
     let ref: ArtifactRef | undefined;
     const key = `task_card:${localDate}`;

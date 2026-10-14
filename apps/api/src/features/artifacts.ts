@@ -32,6 +32,8 @@ export async function artifactWrite(
         content:
           typeof content === "string" ? content : JSON.stringify(content),
         evidence_message_ids: JSON.stringify(evidenceIds),
+        supersedes_id:
+          w.artifacts.filter((a) => a.kind === kind).at(-1)?.id ?? null,
       },
     },
   };

@@ -69,6 +69,8 @@ export interface PublicMessage {
   created_at: string;
 }
 export interface PublicArtifactDTO {
+  tombstone?: boolean;
+  supersedes_id?: string | null;
   id: string;
   kind: string;
   version: number;
@@ -100,6 +102,42 @@ export interface CompletionEvidenceDTO {
   }[];
 }
 export interface WorkspaceDTO {
+  weekly_review?: {
+    id: string;
+    version: number;
+    prompt: string;
+    index: number;
+    total: number;
+  } | null;
+  reviews?: {
+    id: string;
+    skill_id: string;
+    goal_version: number;
+    due_date: string;
+    form: string;
+    status: string;
+  }[];
+  assessments?: {
+    question_id: string;
+    prompt: string;
+    session_id: string;
+    purpose: string;
+    goal_version: number;
+    attempts: {
+      id: string;
+      index: number;
+      answer_message_id: string;
+      text: string;
+      evaluations: {
+        id: string;
+        verdict: string;
+        feedback: string;
+        followup: string | null;
+        reveal_allowed: boolean;
+        policy_version: number | null;
+      }[];
+    }[];
+  }[];
   project: {
     id: string;
     name: string;
