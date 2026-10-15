@@ -4,11 +4,11 @@
 >
 > 一个学习目标，一个专属学习群。四位 AI 分工协作，陪你找到资料、制定计划、练习表达，最终留下自己的学习成果。
 
-[打开学习 Demo](https://ai-learning-web.syl-pi-agent.workers.dev) · [浏览一页项目介绍](https://ai-learning-web.syl-pi-agent.workers.dev/introduction.html) · [查看完整源码](https://github.com/xiaoyaxy/ai-learning-system/tree/codex/initial-implementation)
+[打开学习 Demo](https://ai-learning-web.syl-pi-agent.workers.dev) · [浏览一页项目介绍](https://ai-learning-web.syl-pi-agent.workers.dev/introduction.html) · [查看完整源码](https://github.com/xiaoyaxy/ai-learning-system/tree/main)
 
 项目介绍无需登录；学习 Demo 需要访问密码。当前为个人、多项目学习 demo。
 
-**源码目前位于 `codex/initial-implementation` 分支。** 仓库默认 `main` 分支展示本介绍，完整应用代码和运行文件请切换到[开发分支](https://github.com/xiaoyaxy/ai-learning-system/tree/codex/initial-implementation)。
+**源码与项目介绍均位于默认 `main` 分支。** 可以直接浏览仓库，或按下方步骤克隆并运行。
 
 ## 学习理念
 
@@ -77,10 +77,10 @@ flowchart LR
 
 ## 快速跑起来
 
-需要 **Node.js 24、npm 11**。先获取包含源码的分支：
+需要 **Node.js 24、npm 11**。克隆项目后启动：
 
 ```sh
-git clone --branch codex/initial-implementation https://github.com/xiaoyaxy/ai-learning-system.git
+git clone https://github.com/xiaoyaxy/ai-learning-system.git
 cd ai-learning-system
 npm ci
 npm run demo
@@ -111,22 +111,22 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-仅使用一个 demo 云环境，不分 staging／production。首次部署配置完成后，执行 `npm run migrate:remote`、`npm run deploy`。详细步骤见[运行与部署](https://github.com/xiaoyaxy/ai-learning-system/blob/codex/initial-implementation/docs/deployment.md)。重新部署不会自动更换访问密码。
+仅使用一个 demo 云环境，不分 staging／production。首次部署配置完成后，执行 `npm run migrate:remote`、`npm run deploy`。详细步骤见[运行与部署](https://github.com/xiaoyaxy/ai-learning-system/blob/main/docs/deployment.md)。重新部署不会自动更换访问密码。
 
 本机需要网络代理时，可将 `HTTPS_PROXY`、`HTTP_PROXY` 和 `NODE_USE_ENV_PROXY=1` 放到被忽略的 `.env.proxy`；本地启动会自动读取。浏览器测试使用独立配置，不加载个人 `.dev.vars`。
 
 ## 源码与文档
 
-以下文件均位于[开发分支](https://github.com/xiaoyaxy/ai-learning-system/tree/codex/initial-implementation)：
+以下文件均位于[主分支](https://github.com/xiaoyaxy/ai-learning-system/tree/main)：
 
 | 目录                                                                                                                      | 内容                                                                        |
 | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| [apps/web](https://github.com/xiaoyaxy/ai-learning-system/tree/codex/initial-implementation/apps/web)                     | 群聊、项目管理、交互卡片、学习档案；`public/introduction.html` 为独立介绍页 |
-| [apps/api](https://github.com/xiaoyaxy/ai-learning-system/tree/codex/initial-implementation/apps/api)                     | 角色编排、持久任务、资料、测验、计划调整、归档与供应商适配                  |
-| [packages/contracts](https://github.com/xiaoyaxy/ai-learning-system/tree/codex/initial-implementation/packages/contracts) | 命令、公开 DTO 和校验                                                       |
-| [tests/e2e](https://github.com/xiaoyaxy/ai-learning-system/tree/codex/initial-implementation/tests/e2e)                   | 真实本地 Workers／D1 的浏览器流程，使用固定供应商替身                       |
+| [apps/web](https://github.com/xiaoyaxy/ai-learning-system/tree/main/apps/web)                     | 群聊、项目管理、交互卡片、学习档案；`public/introduction.html` 为独立介绍页 |
+| [apps/api](https://github.com/xiaoyaxy/ai-learning-system/tree/main/apps/api)                     | 角色编排、持久任务、资料、测验、计划调整、归档与供应商适配                  |
+| [packages/contracts](https://github.com/xiaoyaxy/ai-learning-system/tree/main/packages/contracts) | 命令、公开 DTO 和校验                                                       |
+| [tests/e2e](https://github.com/xiaoyaxy/ai-learning-system/tree/main/tests/e2e)                   | 真实本地 Workers／D1 的浏览器流程，使用固定供应商替身                       |
 
-[产品需求](https://github.com/xiaoyaxy/ai-learning-system/blob/codex/initial-implementation/AI学习多Agent系统-岗位卡片.md) · [技术设计](https://github.com/xiaoyaxy/ai-learning-system/blob/codex/initial-implementation/docs/technical-design.md) · [实施计划](https://github.com/xiaoyaxy/ai-learning-system/blob/codex/initial-implementation/docs/superpowers/plans/2026-10-14-ai-learning-system.md) · [验收记录](https://github.com/xiaoyaxy/ai-learning-system/blob/codex/initial-implementation/docs/acceptance.md)
+[产品需求](https://github.com/xiaoyaxy/ai-learning-system/blob/main/AI学习多Agent系统-岗位卡片.md) · [技术设计](https://github.com/xiaoyaxy/ai-learning-system/blob/main/docs/technical-design.md) · [实施计划](https://github.com/xiaoyaxy/ai-learning-system/blob/main/docs/superpowers/plans/2026-10-14-ai-learning-system.md) · [验收记录](https://github.com/xiaoyaxy/ai-learning-system/blob/main/docs/acceptance.md)
 
 ## 当前 Demo 范围
 
