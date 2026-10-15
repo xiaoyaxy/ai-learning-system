@@ -1,0 +1,44 @@
+{
+  "name": "ai-learning-api",
+  "account_id": "72d69b8b29c0213ad4a202b6900a8569",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "vars": {
+    "DEPLOYMENT_ENV": "cloud",
+    "AUTH_MODE": "demo-password",
+    "PUBLIC_ORIGIN": "https://ai-learning-web.syl-pi-agent.workers.dev",
+    "MODEL_PROVIDER": "compatible",
+    "MODEL_NAME": "deepseek-flash",
+    "MODEL_API_URL": "https://api.deepseek.com/chat/completions",
+    "MODEL_TOKEN_PARAMETER": "max_tokens",
+    "MODEL_THINKING": "disabled",
+    "SEARCH_PROVIDER": "tavily",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ai-learning",
+      "database_id": "714f8a77-a5f7-481b-8cc8-5165c1f86686",
+      "migrations_dir": "src/db/migrations",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PROJECT_SUPERVISOR",
+        "class_name": "ProjectSupervisor",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ProjectSupervisor"],
+    },
+  ],
+  "observability": {
+    "enabled": true,
+  },
+}

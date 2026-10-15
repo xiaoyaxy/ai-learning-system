@@ -1,0 +1,19 @@
+# Local real-provider mode. Copy to apps/api/.dev.vars and fill server-side values.
+DEPLOYMENT_ENV=local
+DEV_OWNER_ID=local-owner
+PUBLIC_ORIGIN=http://127.0.0.1:8787
+MODEL_PROVIDER=compatible
+MODEL_NAME=
+MODEL_API_URL=
+MODEL_API_KEY=
+# Use max_completion_tokens if the selected endpoint requires that parameter.
+MODEL_TOKEN_PARAMETER=max_tokens
+# DeepSeek: use disabled for a faster demo; omit for other providers.
+# MODEL_THINKING=disabled
+SEARCH_PROVIDER=tavily
+SEARCH_API_KEY=
+DEMO_MODE=false
+
+# 云端 demo 使用 AUTH_MODE=demo-password；以下两项配置到 Cloudflare Secrets。
+# DEMO_ACCESS_PASSWORD：至少16字符随机值
+# DEMO_SESSION_SECRET：至少32字符随机值

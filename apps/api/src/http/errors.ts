@@ -1,0 +1,70 @@
+import type { ErrorDTO } from "@learning/contracts";
+export class ApiError extends Error {
+  constructor(
+    public code: string,
+    public status: number = 422,
+    public retryable = false,
+    public current_revision?: number,
+  ) {
+    super(code);
+  }
+}
+export function publicError(error: unknown): {
+  status: number;
+  body: ErrorDTO;
+} {
+  const code = String(error).includes("D1_ERROR")
+    ? "STORAGE_UNAVAILABLE"
+    : error instanceof Error && "code" in error
+      ? String(error.code)
+      : "INTERNAL_ERROR";
+  const statuses: Record<string, number> = {
+    UNAUTHENTICATED: 401,
+    INVALID_REQUEST: 422,
+    FORBIDDEN: 403,
+    REVISION_CONFLICT: 409,
+    IDEMPOTENCY_CONFLICT: 409,
+    RUN_BUSY: 409,
+    STALE_EPOCH: 409,
+    INVALID_STAGE: 409,
+    ANSWER_PENDING: 409,
+    NOT_IMPLEMENTED: 501,
+    POLICY_REQUIRED: 409,
+    CONFIGURATION_REQUIRED: 503,
+    QUOTA_EXCEEDED: 429,
+    STORAGE_UNAVAILABLE: 503,
+  };
+  const status =
+    error instanceof ApiError ? error.status : (statuses[code] ?? 500);
+  const message: Record<string, string> = {
+    UNAUTHENTICATED: "需要有效的本人登录",
+    INVALID_REQUEST: "输入格式不正确，请检查确认名称",
+    FORBIDDEN: "无权执行此操作",
+    REVISION_CONFLICT: "状态已更新，请刷新后重试",
+    RUN_BUSY: "当前协作正在执行，请稍候或暂停",
+    IDEMPOTENCY_CONFLICT: "同一操作编号不能对应不同内容",
+    CONFIGURATION_REQUIRED: "需要配置模型、搜索或登录服务",
+    POLICY_REQUIRED: "请先确认完成检验评分政策",
+    STORAGE_UNAVAILABLE: "存储暂不可用，已有进度保留",
+    PROVIDER_AUTH_FAILED: "供应商认证失败，请检查服务器上的密钥配置",
+    PROVIDER_UNAVAILABLE: "供应商暂不可用，已有记录保留",
+    MODEL_INVALID_RESULT: "模型返回的内容不符合本步骤格式，已有记录保留",
+    INPUT_TOO_LARGE: "这一步上下文过长，请分段提供或缩短补充表达",
+  };
+  return {
+    status,
+    body: {
+      code,
+      message: message[code] ?? "请求未完成",
+      retryable:
+        error instanceof ApiError
+          ? error.retryable
+          : ["QUOTA_EXCEEDED", "STORAGE_UNAVAILABLE"].includes(code),
+      ...(error instanceof Error &&
+      "current_revision" in error &&
+      typeof error.current_revision === "number"
+        ? { current_revision: error.current_revision }
+        : {}),
+    },
+  };
+}

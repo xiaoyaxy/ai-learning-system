@@ -21,7 +21,7 @@
 - 日常调整可自主执行；可能影响用户明确目标时，先请示、后生效。
 - 项目相关考题答对至少 80% 是完成标准；初稿、终稿不增加额外完成门槛。
 - 前后端分离，Cloudflare 一体部署，Cloudflare Agents SDK、D1，免费方案优先。
-- Workers compatibility_date 固定为 `2026-10-14`，依赖精确版本在 T01 验证后写入 package-lock.json。
+- Workers compatibility_date 固定为 `2026-10-13`，依赖精确版本在 T01 验证后写入 package-lock.json。
 - 单次 run 最多 8 次模型请求、12 次业务工具调用、6 次专家交接；最多 2 次单步骤自动重试（额外尝试），单次外部请求超时 30 秒；输出上限 2,048 tokens；一个步骤最多读取 8,000 字符来源片段。
 - 单页消息／事件最多 50 条；正文限制 12,000 Unicode 字符，请求体限制 64 KiB。
 - 未确认评分政策不得自动判定 met；未配置生产鉴权不得开放个人数据；不得自动升级付费。
@@ -107,7 +107,7 @@ expect((await web.fetch('/api/v1/health')).status).toBe(200);
 ```
 
 - [ ] **Step 3：运行失败测试。** `npm test --workspace packages/contracts -- commands.test.ts`、`npm test --workspace apps/api -- platform.test.ts`；预期缺失实现或断言失败，不把配置／导入错误当作有效红灯。
-- [ ] **Step 4：实现最小平台连接与契约。** 导出 Agent 类、配置 SQLite migration、静态资源与 `/api/*` 转发、健康路由；在测试 fixture 内定义 child、scheduledResult、web。兼容日期固定 2026-10-14；以选定 SDK 类型确认 subAgent 与 schedule 的参数，不凭旧样例推断。
+- [ ] **Step 4：实现最小平台连接与契约。** 导出 Agent 类、配置 SQLite migration、静态资源与 `/api/*` 转发、健康路由；在测试 fixture 内定义 child、scheduledResult、web。兼容日期固定 2026-10-13；以选定 SDK 类型确认 subAgent 与 schedule 的参数，不凭旧样例推断。
 - [ ] **Step 5：验证并记录。** 上述测试全部 PASS；`npm run typecheck` 与 `npm run build` 成功。docs/compatibility.md 记录精确版本、SDK 接口、兼容标志、测试命令与真实结果。兼容未通过不得推进依赖任务。
 - [ ] **Step 6：提交。** `git add package.json package-lock.json tsconfig.base.json README.md apps/web apps/api packages/contracts docs/compatibility.md`；`git commit -m "chore: verify Cloudflare workspace and contracts"`。仅暂存本任务新建的应用目录，不包含 prototype/ 和既有需求源文件。
 
@@ -394,7 +394,7 @@ expect(runAfterFailure.committed_artifacts).toEqual(runBeforeFailure.committed_a
 - [ ] **Step 3：运行红灯并实现真实适配。** `npm test --workspace apps/api -- live-adapters.test.ts`；再实现选定服务、secrets、错误映射、预算与已知用量。真实 URL 提取证明公网／重定向限制；缺失能力时使用可验证的受控提取服务，不直接放开任意 fetch。
 - [ ] **Step 4：运行整体自动验证。** `npm run typecheck`、`npm test`、`npm run build`、`npm run test:e2e`，全部成功；核对 A01–A16。mock 测试结果与真实模型质量分栏记录，不写未运行的 PASS。
 - [ ] **Step 5：验证真实模型与免费可行性。** 用不少于 12 个精心设计的固定样例覆盖角色权限、先答后评、一次追问、来源支持、开放题不确定、错误概念、目标影响、用户理解缺项、不代写与医法金边界；人工核对输出与引用。重复出现泄题／越权／代写的模型不得上线该功能。测一次建项目全链、一次测验纠错、一次请示，记录 Worker CPU、D1 rows_read／rows_written、DO 和模型／搜索已知用量；免费限额不满足则先提出可验证调整，不自行升级付费。
-- [ ] **Step 6：按发布手册部署授权环境。** local→staging→production 分库／命名空间；迁移→API→Web。API 禁公共入口，配置 Access 或已选鉴权，Web 同源转发。Secrets 用 Wrangler secret 配置，不进入代码或输出。保留迁移与应用回滚步骤；回滚不能删除诊断／答题历史。
+- [ ] **Step 6：按发布手册部署授权环境。** 按用户 2026-10-14 指示，仅一个 demo 云环境，本地一条命令启动；迁移→API→Web。API 禁公共入口，配置 Access 或已选鉴权，Web 同源转发。Secrets 用 Wrangler secret 配置，不进入代码或输出。保留迁移与应用回滚步骤；回滚不能删除诊断／答题历史。
 - [ ] **Step 7：重开线上页面验收并提交。** 登录本人身份，运行两个项目隔离、来源读取、等待作答、80% 证据（已确认政策）、目标请示、暂停重开及搜索失败场景；核对控制台与真实保存记录。docs/acceptance.md 填实际日期、模型／版本、A01–A16 证据、未过项和限制。`git add apps/api/src/providers apps/api/src/env.ts apps/api/wrangler.jsonc apps/web/wrangler.jsonc tests/evals docs/deployment.md docs/acceptance.md`；`git commit -m "feat: validate live providers and Cloudflare deployment"`。配置或验收未完成时记录未完成，不写成已上线。
 
 ## 4. 自查与交付标准

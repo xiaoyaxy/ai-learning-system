@@ -1,0 +1,364 @@
+import { ResourceService } from "./resources/service";
+import { ConfiguredSearchProvider } from "../providers/search";
+import { UnconfiguredSourceReader } from "../providers/source-reader";
+import type { Env } from "../env";
+import type { RunRecord, IngressContext } from "../db/types";
+import type { CommandEnvelope } from "@learning/contracts";
+import { ProjectRepository } from "../db/repository";
+import type { RoleExecutor } from "./planning/service";
+import { PlanningService } from "./planning/service";
+import { ApiError } from "../http/errors";
+import { AssessmentService } from "./assessment/service";
+import { toWorkspaceDTO } from "../http/projector";
+import { ArchiveService } from "./archive/service";
+export async function runLearningCommand(
+  repo: ProjectRepository,
+  ctx: IngressContext,
+  run: RunRecord,
+  execute: RoleExecutor,
+  command: CommandEnvelope["command"],
+  environment?: Env,
+): Promise<boolean> {
+  const w = await repo.readWorkspace(ctx.project_id),
+    message = w.messages.find(
+      (m) => m.run_id === run.id && m.sender_role === "user",
+    ),
+    planner = new PlanningService(repo, execute),
+    toolCtx = {
+      ...ctx,
+      operation_id: run.operation_id,
+      step_key: "planning",
+      base_revision: w.project.revision,
+      epoch: run.epoch,
+      actor: "planner" as const,
+      run_id: run.id,
+    };
+  const assessment = new AssessmentService(repo, execute),
+    coachCtx = { ...toolCtx, actor: "coach" as const };
+  const archive = new ArchiveService(repo, execute),
+    curatorCtx = { ...toolCtx, actor: "curator" as const },
+    pending = w.project.pending_input_json
+      ? JSON.parse(w.project.pending_input_json)
+      : null;
+  // Persist interpretation before a service changes phase or pending input.
+  let route = {
+    phase: w.project.phase as string,
+    pending_kind: pending?.kind as string | null,
+  };
+  if (command.type === "send_message") {
+    let receipt = await repo.readReceipt(
+      ctx.project_id,
+      run.operation_id,
+      "workflow_route",
+    );
+    if (!receipt)
+      receipt = await repo.commitStep(
+        {
+          ...ctx,
+          operation_id: run.operation_id,
+          step_key: "workflow_route",
+          base_revision: w.project.revision,
+          epoch: run.epoch,
+          actor: "runtime",
+        },
+        {
+          result: {
+            phase: route.phase,
+            pending_kind: route.pending_kind ?? null,
+          },
+        },
+      );
+    route = {
+      phase: String(receipt.result.phase),
+      pending_kind: receipt.result.pending_kind
+        ? String(receipt.result.pending_kind)
+        : null,
+    };
+  }
+  if (command.type === "reassess_answer") {
+    const a = w.attempts.find((a) => a.id === command.attempt_id);
+    if (!a) throw new ApiError("FORBIDDEN", 403);
+    await assessment.evaluate(
+      coachCtx,
+      {
+        id: String(a.id),
+        question_id: String(a.question_id),
+        attempt_index: Number(a.attempt_index),
+      },
+      { recheck: true },
+    );
+    return true;
+  }
+  if (command.type === "record_learning") {
+    if (!message) throw new ApiError("INVALID_STAGE", 409);
+    await archive.createLearningCard(curatorCtx, [message.id]);
+    return true;
+  }
+  if (command.type === "save_note") {
+    await archive.saveNote(
+      curatorCtx,
+      command.text,
+      command.base_note
+        ? { ...command.base_note, project_id: ctx.project_id, kind: "note" }
+        : undefined,
+    );
+    await archive.createIndex(curatorCtx);
+    return true;
+  }
+  if (command.type === "delete_note") {
+    await archive.deleteNote(curatorCtx, {
+      id: command.note_id,
+      version: command.note_version,
+      project_id: ctx.project_id,
+      kind: "note",
+    });
+    await archive.createIndex(curatorCtx);
+    return true;
+  }
+  if (command.type === "complete_review") {
+    await archive.completeReview(curatorCtx, command.review_id, command.text);
+    await archive.createIndex(curatorCtx);
+    return true;
+  }
+  if (command.type === "submit_draft" || command.type === "submit_final") {
+    const ref = await archive.submitUserArtifact(
+      { ...toolCtx, actor: "trusted_ingress" },
+      {
+        kind: command.type === "submit_draft" ? "draft" : "final",
+        text: command.text,
+      },
+    );
+    if (command.type === "submit_draft")
+      await archive.reviewDraft(coachCtx, ref);
+    await archive.createIndex(curatorCtx);
+    return true;
+  }
+  if (command.type === "start_weekly_review") {
+    await archive.startWeeklyReview(curatorCtx);
+    return true;
+  }
+  if (
+    command.type === "send_message" &&
+    command.mode === "answer" &&
+    route.pending_kind === "weekly_review" &&
+    (!command.target_role || command.target_role === "curator")
+  ) {
+    await archive.answerWeekly(curatorCtx, command.text);
+    return true;
+  }
+  const originalCommand = w.runs.find((r) => r.id === run.id)?.command_json;
+  if (
+    originalCommand &&
+    JSON.parse(originalCommand).type === "supplement_requirements" &&
+    w.project.active_plan_id
+  ) {
+    if (!message) throw new ApiError("INVALID_STAGE", 409);
+    await planner.proposeRequirements(toolCtx, message.id);
+    return true;
+  }
+  if (command.type === "decide_proposal") {
+    await planner.recordDecision(toolCtx, command);
+    return true;
+  }
+  if (
+    command.type === "start_practice" ||
+    command.type === "start_completion_check"
+  ) {
+    await assessment.start(
+      coachCtx,
+      command.type === "start_practice" ? "practice" : "completion",
+    );
+    return true;
+  }
+  if (command.type === "confirm_assessment_policy") {
+    await assessment.confirmPolicy(coachCtx, command);
+    return true;
+  }
+  if (command.type === "revise_assessment_policy") {
+    await assessment.proposePolicy(coachCtx, command);
+    return true;
+  }
+  if (
+    command.type === "submit_answer" ||
+    (command.type === "send_message" && command.mode === "answer")
+  ) {
+    if (
+      command.type === "send_message" &&
+      command.target_role &&
+      command.target_role !== "coach" &&
+      command.target_role !== "supervisor"
+    )
+      throw new ApiError("ANSWER_PENDING", 409);
+    const q = toWorkspaceDTO(w).question;
+    // Replayed runs can already have saved their answer while evaluation is pending.
+    const previous = w.attempts.find((a) =>
+      w.messages.some(
+        (m) => m.id === a.answer_message_id && m.run_id === run.id,
+      ),
+    );
+    const input =
+      command.type === "submit_answer"
+        ? command
+        : q
+          ? {
+              question_id: q.id,
+              question_version: q.version,
+              attempt_index: q.attempt_index,
+              text: command.text,
+            }
+          : previous
+            ? {
+                question_id: String(previous.question_id),
+                question_version: 1,
+                attempt_index: Number(previous.attempt_index),
+                text: command.text,
+              }
+            : null;
+    if (!input) throw new ApiError("INVALID_STAGE", 409);
+    const attempt = await assessment.submit(coachCtx, input);
+    const evaluation = await assessment.evaluate(coachCtx, attempt);
+    const after = await repo.readWorkspace(ctx.project_id);
+    if (
+      evaluation.reveal_allowed &&
+      ["incorrect", "partial"].includes(evaluation.verdict) &&
+      !after.project.pending_input_json &&
+      after.project.active_plan_id
+    ) {
+      await planner.proposeAdjustment(toolCtx, evaluation.id);
+    }
+    return true;
+  }
+  if (
+    command.type === "send_message" &&
+    route.phase === "scoping" &&
+    (!command.target_role ||
+      ["supervisor", "planner"].includes(command.target_role))
+  ) {
+    if (!message) throw new ApiError("INVALID_STAGE", 409);
+    const outcome = await planner.scope(toolCtx, { message_id: message.id });
+    if (outcome.kind === "definition" && environment)
+      await prepareProject(repo, ctx, run, execute, environment);
+    return true;
+  }
+  if (
+    command.type === "submit_diagnosis" ||
+    (command.type === "send_message" &&
+      route.phase === "diagnosis" &&
+      !command.target_role)
+  ) {
+    if (!message) throw new ApiError("INVALID_STAGE", 409);
+    await planner.saveDiagnosis(toolCtx, message.id);
+    if (environment) await prepareProject(repo, ctx, run, execute, environment);
+    return true;
+  }
+  if (
+    command.type === "send_message" &&
+    route.phase === "preparing" &&
+    environment
+  ) {
+    await prepareProject(repo, ctx, run, execute, environment);
+    return true;
+  }
+  if (
+    command.type === "start_learning" ||
+    (command.type === "send_message" &&
+      command.mode === "message" &&
+      route.pending_kind === "start_learning" &&
+      (!command.target_role ||
+        ["supervisor", "planner"].includes(command.target_role)) &&
+      /^(?:好[的]?[,，、\s]*)?(?:开始(?:学习)?|开始吧|开始学习吧)[!！。\s]*$/.test(
+        command.text.trim(),
+      ))
+  ) {
+    if (w.project.phase !== "learning")
+      throw new ApiError("INVALID_STAGE", 409);
+    const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: w.project.timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(new Date()),
+      date = ["year", "month", "day"]
+        .map((k) => parts.find((p) => p.type === k)!.value)
+        .join("-");
+    await planner.createTaskCard(toolCtx, date);
+    return true;
+  }
+  return false;
+}
+
+async function prepareProject(
+  repo: ProjectRepository,
+  ctx: IngressContext,
+  run: RunRecord,
+  execute: RoleExecutor,
+  environment: Env,
+) {
+  const w = await repo.readWorkspace(ctx.project_id),
+    definition = w.artifacts.filter((a) => a.kind === "definition").at(-1);
+  if (!definition) throw new ApiError("INVALID_STAGE", 409);
+  const base = {
+    ...ctx,
+    operation_id: run.operation_id,
+    step_key: "prepare",
+    base_revision: w.project.revision,
+    epoch: run.epoch,
+    run_id: run.id,
+  };
+  const bundle = await new ResourceService(
+    repo,
+    new ConfiguredSearchProvider(environment),
+    new UnconfiguredSourceReader(),
+    execute,
+  ).prepare({ ...base, actor: "curator" }, JSON.parse(definition.content));
+  const planner = new PlanningService(repo, execute);
+  await planner.createPlan(
+    { ...base, actor: "planner" },
+    {
+      definition_id: definition.id,
+      source_ids: bundle.source_ids,
+      review_ids: [],
+    },
+  );
+  const current = await repo.readWorkspace(ctx.project_id);
+  const text =
+    "资料与整体学习计划已准备好。是否开始学习？回复“开始”或点击“开始学习”，规划师将给出今日学习内容和资料链接。";
+  await repo.commitStep(
+    {
+      ...base,
+      actor: "runtime",
+      step_key: "ask_start",
+      base_revision: current.project.revision,
+    },
+    {
+      project_changes: {
+        pending_input_json: JSON.stringify({
+          kind: "start_learning",
+          entity_id: current.project.active_plan_id ?? definition.id,
+          version: 1,
+          expected_role: "supervisor",
+        }),
+      },
+      run_changes: { run_id: run.id, status: "waiting_user" },
+      entities: [
+        {
+          table: "messages",
+          row: {
+            id: crypto.randomUUID(),
+            sender_role: "supervisor",
+            body: text,
+            run_id: run.id,
+          },
+        },
+      ],
+      events: [
+        {
+          type: "message_committed",
+          role: "supervisor",
+          run_id: run.id,
+          payload: { text },
+        },
+      ],
+    },
+  );
+}
